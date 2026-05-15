@@ -14,7 +14,7 @@ at tool-registration time, and we use closure-scoped type aliases (e.g.
 """
 
 import logging
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, TypeVar
 
 from memanto.app.constants import (
     VALID_MEMORY_TYPES,
@@ -107,7 +107,9 @@ class RecallResult(BaseModel):
     status: str
     agent_id: str
     query: str | None = None
-    mode: str = Field(default="semantic", description="semantic | recent | as_of | changed_since")
+    mode: str = Field(
+        default="semantic", description="semantic | recent | as_of | changed_since"
+    )
     count: int = 0
     memories: list[MemoryHit] = Field(default_factory=list)
     message: str | None = None
@@ -164,7 +166,12 @@ class AgentListResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _error_payload(model_cls: type[BaseModel], message: str, **defaults: Any) -> Any:
+T = TypeVar("T", bound=BaseModel)
+# NOTE: we cannot use 'from __future__ import annotations' here (see module docstring)
+# so we use traditional type hints.
+
+
+def _error_payload(model_cls: type[T], message: str, **defaults: Any) -> T:
     """Build a uniform error response of the given result model type."""
     return model_cls(status="error", message=message, **defaults)
 
@@ -361,9 +368,13 @@ def register_tools(mcp: Any, lifecycle: MemantoLifecycle) -> None:
             # Validate before round-trip so we fail fast with a clear error.
             for i, item in enumerate(memories):
                 if not isinstance(item, dict):
-                    raise ValueError(f"memories[{i}] must be an object, got {type(item).__name__}")
+                    raise ValueError(
+                        f"memories[{i}] must be an object, got {type(item).__name__}"
+                    )
                 if "content" not in item or not str(item["content"]).strip():
-                    raise ValueError(f"memories[{i}] is missing required field 'content'")
+                    raise ValueError(
+                        f"memories[{i}] is missing required field 'content'"
+                    )
                 m_type = item.get("type", "fact")
                 if m_type not in VALID_MEMORY_TYPES:
                     raise ValueError(
@@ -399,7 +410,9 @@ def register_tools(mcp: Any, lifecycle: MemantoLifecycle) -> None:
                 results=sub_results,
             )
         except NoAgentConfiguredError as exc:
-            return _error_payload(BatchRememberResult, str(exc), agent_id=agent_id or "")
+            return _error_payload(
+                BatchRememberResult, str(exc), agent_id=agent_id or ""
+            )
         except Exception as exc:
             logger.exception("batch_remember failed")
             return _error_payload(
@@ -479,7 +492,9 @@ def register_tools(mcp: Any, lifecycle: MemantoLifecycle) -> None:
                 memories=hits,
             )
         except NoAgentConfiguredError as exc:
-            return _error_payload(RecallResult, str(exc), agent_id=agent_id or "", query=query)
+            return _error_payload(
+                RecallResult, str(exc), agent_id=agent_id or "", query=query
+            )
         except Exception as exc:
             logger.exception("recall failed")
             return _error_payload(
@@ -773,7 +788,9 @@ def _register_admin_tools(mcp: Any, lifecycle: MemantoLifecycle) -> None:
                 namespace=agent.get("namespace"),
                 pattern=agent.get("pattern"),
                 description=agent.get("description"),
-                created_at=str(agent.get("created_at")) if agent.get("created_at") else None,
+                created_at=str(agent.get("created_at"))
+                if agent.get("created_at")
+                else None,
             )
         except AgentAlreadyExistsError as exc:
             return AgentInfoResult(
@@ -783,7 +800,9 @@ def _register_admin_tools(mcp: Any, lifecycle: MemantoLifecycle) -> None:
             )
         except Exception as exc:
             logger.exception("create_agent failed")
-            return _error_payload(AgentInfoResult, _format_exception(exc), agent_id=agent_id)
+            return _error_payload(
+                AgentInfoResult, _format_exception(exc), agent_id=agent_id
+            )
 
     @mcp.tool(
         name="list_agents",
@@ -802,7 +821,9 @@ def _register_admin_tools(mcp: Any, lifecycle: MemantoLifecycle) -> None:
         description="Look up an agent's metadata by id.",
     )
     def get_agent(
-        agent_id: Annotated[str, Field(description="Agent id to look up.", min_length=1)],
+        agent_id: Annotated[
+            str, Field(description="Agent id to look up.", min_length=1)
+        ],
     ) -> AgentInfoResult:
         try:
             agent = lifecycle.client.get_agent(agent_id)
@@ -812,7 +833,9 @@ def _register_admin_tools(mcp: Any, lifecycle: MemantoLifecycle) -> None:
                 namespace=agent.get("namespace"),
                 pattern=agent.get("pattern"),
                 description=agent.get("description"),
-                created_at=str(agent.get("created_at")) if agent.get("created_at") else None,
+                created_at=str(agent.get("created_at"))
+                if agent.get("created_at")
+                else None,
             )
         except AgentNotFoundError as exc:
             return AgentInfoResult(
@@ -820,7 +843,9 @@ def _register_admin_tools(mcp: Any, lifecycle: MemantoLifecycle) -> None:
             )
         except Exception as exc:
             logger.exception("get_agent failed")
-            return _error_payload(AgentInfoResult, _format_exception(exc), agent_id=agent_id)
+            return _error_payload(
+                AgentInfoResult, _format_exception(exc), agent_id=agent_id
+            )
 
     @mcp.tool(
         name="delete_agent",
@@ -831,7 +856,9 @@ def _register_admin_tools(mcp: Any, lifecycle: MemantoLifecycle) -> None:
         ),
     )
     def delete_agent(
-        agent_id: Annotated[str, Field(description="Agent id to delete.", min_length=1)],
+        agent_id: Annotated[
+            str, Field(description="Agent id to delete.", min_length=1)
+        ],
     ) -> AgentInfoResult:
         try:
             lifecycle.client.delete_agent(agent_id)
@@ -842,7 +869,9 @@ def _register_admin_tools(mcp: Any, lifecycle: MemantoLifecycle) -> None:
             )
         except Exception as exc:
             logger.exception("delete_agent failed")
-            return _error_payload(AgentInfoResult, _format_exception(exc), agent_id=agent_id)
+            return _error_payload(
+                AgentInfoResult, _format_exception(exc), agent_id=agent_id
+            )
 
 
 # ---------------------------------------------------------------------------
