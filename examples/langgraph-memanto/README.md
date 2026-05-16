@@ -4,11 +4,15 @@ This example demonstrates how to use **Memanto** to give your **LangGraph** agen
 
 While LangGraph's native `State` is fantastic for maintaining context during a single workflow run, it is ephemeral once the graph execution completes. Memanto acts as the long-term semantic database for your agent, allowing it to remember user preferences, facts, and past instructions forever.
 
-## 📺 Demo & Social Traction
+## 📺 Demo
 
-Check out the 30-second Demo Video of this agent in action:
+Watch the 30-second demo of the agent recalling Alice's preferences across two completely isolated sessions:
+
+https://github.com/user-attachments/assets/b9e63b79-19cd-43e8-b33c-157d5f82baf0
+
+**Discussion & traction:**
 - [▶️ Watch on X (Twitter)](https://x.com/Johan2aa/status/2054277719697903695)
-- [▶️ Join the discussion on Reddit (r/LangChain)](https://www.reddit.com/r/LangChain/comments/1tbb3nx/i_solved_the_langgraph_crosssession_memory/)
+- [💬 Reddit r/LangChain thread](https://www.reddit.com/r/LangChain/comments/1tbb3nx/i_solved_the_langgraph_crosssession_memory/)
 
 ## 🛠️ How it works
 
