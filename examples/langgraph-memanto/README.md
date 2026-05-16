@@ -54,7 +54,7 @@ python run_writer.py
 ## File Structure
 
 ```
-examples/langgraph-memory/
+examples/langgraph-memanto/
 ├── README.md                  # This file
 ├── requirements.txt           # Python dependencies
 ├── .env.example               # API key template
