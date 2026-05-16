@@ -6,8 +6,6 @@ This directory contains a real-world example of **LangGraph** agents using **Mem
 
 ## Architecture
 
-![LangGraph + Memanto: Persistent Multi-Agent Memory](https://github.com/moorcheh-ai/memanto/raw/main/assets/langgraph-architecture.png)
-
 ## 30-Second Demo
 
 ![LangGraph + Memanto Demo](demo.gif)
