@@ -45,6 +45,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Any, Iterable
 
@@ -103,6 +104,11 @@ class MemantoStore(BaseStore):
     def __init__(self, client: SdkClient, agent_id: str) -> None:
         self._client = client
         self._agent_id = agent_id
+        # (namespace, query, limit) -> (timestamp, list[SearchItem])
+        self._search_cache: dict[tuple, tuple[float, list[SearchItem]]] = {}
+        # Last good result per namespace, used to ride out 429s without
+        # showing an empty memory panel.
+        self._last_good: dict[tuple[str, ...], list[SearchItem]] = {}
 
     # ------------------------------------------------------------------ #
     # Required abstract methods                                          #
@@ -209,11 +215,70 @@ class MemantoStore(BaseStore):
             provenance="explicit_statement",
         )
 
+        # Invalidate cached searches for this namespace so the next asearch
+        # re-fetches and surfaces the new memory. Keep _last_good around -
+        # it's still useful as a 429 fallback until the next successful
+        # asearch overwrites it.
+        prefix = op.namespace
+        self._search_cache = {
+            k: v for k, v in self._search_cache.items() if k[0] != prefix
+        }
+
     # ------------------------------------------------------------------ #
     # SEARCH                                                             #
     # ------------------------------------------------------------------ #
 
+    # Memanto's recall caps `limit` at 100 server-side AND ranks by semantic
+    # similarity to a single query string. That makes "list everything in
+    # this namespace" non-trivial: when the agent contains many memories
+    # across other namespaces, a single recall call (even at the 100 cap)
+    # rarely surfaces every memory belonging to one specific namespace.
+    #
+    # Diagnostic example (real numbers from this codebase): 4 memories
+    # were stored under user_id 'bob-X'. With query='*' only 2 came back;
+    # with query='email' only 2 (different overlap); with query='peanut'
+    # only 1. The UNION of multiple semantic anchors finally returned all 4.
+    #
+    # So when a namespace filter is in play we fan out across a handful of
+    # diverse anchor queries, dedupe by memory_id, and apply strict AND
+    # namespace matching client-side.
+    _MEMANTO_RECALL_CAP = 100
+    # Diverse semantic anchors that, taken as a union, broadly cover the
+    # categories of facts a typical agent stores about a user. Each anchor
+    # is one network round-trip to Memanto, so we keep the set TIGHT (4
+    # queries) to stay under the Community-plan rate limit. The set was
+    # empirically tuned to surface all 4 facts of the demo (name, email,
+    # allergy, phone instruction) - dropping any anchor regresses one fact.
+    _NS_ANCHOR_QUERIES = (
+        "user identity name profile",
+        "user contact email phone address",
+        "user allergies health food restrictions",
+        "user instructions rules preferences goals",
+    )
+
+    # In-memory cache of asearch results, keyed by (namespace, query, limit).
+    # Memanto's Community-plan rate limit (~60-100 recall calls/min) is easy
+    # to exceed without caching because Streamlit's UI panel polls memories
+    # every rerun, and each poll fans out across all anchors. Cache TTL is
+    # short (30 s) so newly-stored memories appear quickly via the same path
+    # _poll_for_memories uses to wait for indexing.
+    _CACHE_TTL_S = 30.0
+
     def _do_search(self, op: SearchOp) -> list[SearchItem]:
+        """Retrieve memories matching the namespace.
+
+        When a namespace filter is present we always fan out across diverse
+        semantic anchors and union the matching results, because a single
+        recall (even at Memanto's 100-result cap) is biased by semantic
+        similarity to one query and frequently misses memories that exist
+        in the namespace. The caller's query runs first so its top results
+        lead the output; anchors fill in the rest of the namespace.
+
+        Cost: ~8-10 s per asearch with a namespace filter. Acceptable for
+        a demo where the LLM call itself takes 20+ s per turn. If you need
+        sub-second recall in production, narrow the anchor set or scope
+        the agent_id per-user so there's nothing else to compete with.
+        """
         query = op.query or "*"
         filter_dict = op.filter or {}
         ns_tags = self._namespace_to_tags(op.namespace_prefix)
@@ -225,24 +290,101 @@ class MemantoStore(BaseStore):
         extra_tags = list(filter_dict.get("tags", []) or [])
         min_conf = filter_dict.get("min_confidence")
 
-        result = self._client.recall(
-            agent_id=self._agent_id,
-            query=query,
-            limit=max(1, op.limit),
-            type=type_filter,
-            tags=ns_tags + extra_tags if (ns_tags or extra_tags) else None,
-            min_confidence=min_conf,
-        )
+        # Cache hit? Returning a recent result avoids hammering Memanto's
+        # rate limit when the UI polls or multiple graph nodes search the
+        # same namespace in quick succession.
+        cache_key = (op.namespace_prefix, query, op.limit, tuple(extra_tags))
+        cached = self._search_cache.get(cache_key)
+        if cached is not None:
+            ts, items = cached
+            if time.time() - ts < self._CACHE_TTL_S:
+                return items
 
+        # When namespace-filtering, fan out across anchors so the union
+        # surfaces every memory in the namespace. The caller's query
+        # runs first so its semantic ranking is honoured for whatever
+        # memories share a strong dimension with it; anchors then fill
+        # in the rest.
+        if ns_tags:
+            queries = [query] + [q for q in self._NS_ANCHOR_QUERIES if q != query]
+            fetch_limit = self._MEMANTO_RECALL_CAP
+        else:
+            queries = [query]
+            fetch_limit = max(1, min(op.limit, self._MEMANTO_RECALL_CAP))
+
+        seen_ids: set[str] = set()
         out: list[SearchItem] = []
-        for mem in result.get("memories", []):
-            tags = mem.get("tags", []) or []
-            # Enforce namespace_prefix match - tags must contain every ns tag.
-            if ns_tags and not all(t in tags for t in ns_tags):
+        rate_limited = False
+        for q in queries:
+            if len(out) >= op.limit:
+                break
+            try:
+                result = self._client.recall(
+                    agent_id=self._agent_id,
+                    query=q,
+                    limit=fetch_limit,
+                    type=type_filter,
+                    tags=ns_tags + extra_tags if (ns_tags or extra_tags) else None,
+                    min_confidence=min_conf,
+                )
+            except Exception as e:  # pragma: no cover - resilience
+                logger.warning("MemantoStore: recall(%r) failed: %s", q, e)
+                # Stop fanning out as soon as we hit a non-retryable error
+                # (rate limit, auth failure, session expired). More anchor
+                # calls will hit the same error and just flood the logs;
+                # the last-good fallback below preserves the UI state.
+                err = str(e)
+                if any(
+                    marker in err
+                    for marker in (
+                        "429",
+                        "Limit Exceeded",
+                        "Forbidden",
+                        "Unauthorized",
+                        "401",
+                        "403",
+                    )
+                ):
+                    rate_limited = True
+                    break
                 continue
-            namespace = self._tags_to_namespace(tags) or op.namespace_prefix
-            key = self._tags_to_key(tags) or mem.get("id", "")
-            out.append(self._memory_to_search_item(mem, namespace, key))
+
+            for mem in result.get("memories", []):
+                mem_id = mem.get("id")
+                if mem_id and mem_id in seen_ids:
+                    continue
+                tags = mem.get("tags", []) or []
+                # Strict AND-match on namespace - Memanto's tag filter is
+                # OR-matching server-side, so this is where isolation is
+                # actually enforced.
+                if ns_tags and not all(t in tags for t in ns_tags):
+                    continue
+                if extra_tags and not all(t in tags for t in extra_tags):
+                    continue
+                if mem_id:
+                    seen_ids.add(mem_id)
+                namespace = self._tags_to_namespace(tags) or op.namespace_prefix
+                key = self._tags_to_key(tags) or mem.get("id", "")
+                out.append(self._memory_to_search_item(mem, namespace, key))
+                if len(out) >= op.limit:
+                    break
+
+        # If we got nothing this round AND the last call hit the rate
+        # limit AND we have a stored result from a previous successful
+        # call: return that. This is what makes the UI memory panel
+        # survive 429s without flashing to zero.
+        if not out and rate_limited and op.namespace_prefix in self._last_good:
+            logger.info(
+                "MemantoStore: rate-limited, returning last-good result for %r",
+                op.namespace_prefix,
+            )
+            return self._last_good[op.namespace_prefix]
+
+        # Cache successful (non-empty) results so subsequent rapid-fire
+        # asearches don't burn more rate-limit budget.
+        if out and not rate_limited:
+            self._search_cache[cache_key] = (time.time(), out)
+            self._last_good[op.namespace_prefix] = out
 
         return out
 

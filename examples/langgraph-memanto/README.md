@@ -56,9 +56,11 @@ streamlit run app.py
 Opens a browser UI with:
 - **Session 1 tab**: chat with the agent; it extracts and stores facts in MemantoStore
 - **Session 2 tab**: a fresh `thread_id` with an empty checkpointer; the agent still recalls everything from Session 1
-- **Live memory panel**: shows every memory currently stored in Memanto for the user, updated after each message
+- **Live memory panel**: shows every memory currently stored in Memanto for the user, updated after each message (with a brief indexing pause so all new memories appear after a single message)
 - **Clear chat history**: resets the chat UI only; stored memories in Memanto are unaffected
 - **Reset demo**: rotates to a fresh user-id namespace so the next run starts with zero visible memories (previous memories are preserved in Memanto under the prior user id)
+
+> **Note on `@st.cache_resource`:** the compiled graph is cached by an MD5 hash of `graph.py`, so editing `graph.py` automatically rebuilds the cached graph on the next rerun. No manual server restart needed when iterating on extraction logic.
 
 ## Step-by-step CLI demo (proves persistence)
 
@@ -154,6 +156,7 @@ No Memanto-specific imports inside your nodes. That's the whole point of being a
 * **`ttl` on put is ignored.** Memanto memories don't expire on a timer.
 * **Pagination `offset` in search is ignored.** Memanto recall doesn't paginate; raise the `limit` instead.
 * **`list_namespaces` is best-effort.** It samples recent memories and derives unique namespaces from their tags.
+* **Namespace listing uses a multi-anchor union internally.** Memanto's recall is semantic search (top-N by similarity to a single query) capped at 100 server-side. When the agent contains many memories under other namespaces, a single recall can rank a target namespace's memories out of the top-100. To compensate, when a namespace filter is present `MemantoStore._do_search` issues the caller's query plus four diverse semantic anchors (identity, contact, health, instructions/goals) and unions the namespace-matching results. Cost: one extra round-trip per anchor. A 30 s in-process cache and a "last good result" fallback keep this from hammering the API on UI polls or rate-limit windows.
 
 These are documented up-front rather than papered over.
 
@@ -174,7 +177,7 @@ These are documented up-front rather than papered over.
 
 * **`MOORCHEH_API_KEY not set`**: copy `.env.example` to `.env` and fill it in.
 * **`OPENROUTER_API_KEY not set`**: the graph routes `langchain-openai` through OpenRouter. Set the env var or override the model via `LANGGRAPH_LLM` (e.g. `LANGGRAPH_LLM=openai/gpt-4o-mini`).
-* **`429 RateLimitError` from OpenRouter**: the default free model (`openai/gpt-oss-120b:free`) is subject to upstream rate limits. The graph's `RetryPolicy` handles this automatically (retries up to 5x with 32 s back-off). If retries are exhausted, set `LANGGRAPH_LLM` to a paid model or add billing credits to your OpenRouter account.
+* **`429 RateLimitError` from OpenRouter**: the default `openai/gpt-oss-120b:free` is the fastest free option (~3 s per extraction) but shares rate limits across all OpenRouter free-tier users. The graph's `RetryPolicy` retries up to 5× with 32 s back-off. If retries are exhausted, switch to another free model via `LANGGRAPH_LLM=openai/gpt-oss-20b:free` (slower but less contested) or a paid model like `openai/gpt-4o-mini`.
 * **`Namespace limit reached (Community plan)`**: the free tier allows 5 agents. List your agents with `client.list_agents()` and delete unused ones with `client.delete_agent(agent_id)`, or reuse an existing agent id.
 * **`Agent already exists`**: fine. `MemantoSetup.setup` catches `AgentAlreadyExistsError` and reuses the existing agent; no action needed.
 * **Streamlit `ScriptRunContext` warnings on startup**: harmless. They appear when Streamlit initialises the cached resources before the browser tab opens. The UI works normally.

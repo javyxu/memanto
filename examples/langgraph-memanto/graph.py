@@ -20,13 +20,16 @@ whole point - see ``examples/langgraph-memanto/README.md`` for why.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+import re
 import uuid
 from typing import Literal
 
 import openai
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableLambda
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
@@ -68,7 +71,12 @@ class ExtractedMemory(BaseModel):
         default="",
         description="Short title, under 80 characters. Leave blank to auto-derive.",
     )
-    content: str = Field(description="Single atomic claim. Be concise and specific.")
+    content: str = Field(
+        description=(
+            "One specific fact about the user. Each entry covers exactly one fact "
+            "and one fact only. Do not combine multiple facts into this field."
+        )
+    )
     confidence: float = Field(
         default=0.9, ge=0.0, le=1.0, description="0.95+ for explicit statements."
     )
@@ -93,16 +101,178 @@ class ExtractedMemories(BaseModel):
 
     memories: list[ExtractedMemory] = Field(
         default_factory=list,
-        description="Zero or more atomic memories. Empty list if the message "
-        "contains no durable facts (greetings, vague questions, small talk).",
+        description=(
+            "ALL distinct facts found in the message, one entry per fact. "
+            "A message with 4 facts MUST produce 4 separate entries. "
+            "Never merge multiple facts into one entry. "
+            "Empty list only for pure greetings or small talk with zero facts."
+        ),
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def _unwrap_bare_list(cls, data):
+        """Accept a bare list [{...}, ...] as well as the canonical {memories:[...]}."""
+        if isinstance(data, list):
+            return {"memories": data}
+        return data
 
-def _default_llm() -> ChatOpenAI:
-    """Build the default LLM. Routes through OpenRouter (matches the CrewAI example).
+
+_VALID_KINDS = {
+    "fact",
+    "preference",
+    "instruction",
+    "commitment",
+    "goal",
+    "observation",
+    "relationship",
+    "context",
+    "decision",
+}
+
+
+def _parse_memories_response(response) -> ExtractedMemories:
+    """Parse LLM output into ExtractedMemories using a line-based format.
+
+    Free-tier OpenRouter models (e.g. openai/gpt-oss-120b:free) do not reliably
+    support function calling and frequently produce malformed JSON when asked
+    for structured arrays. A single bad character collapses the entire extraction
+    to zero or one item.
+
+    We sidestep the problem entirely by asking the model to emit one fact per
+    line as ``KIND::CONTENT``. Each line is parsed independently, so a malformed
+    line costs at most one memory instead of all of them. JSON fallback is
+    retained for backwards compatibility if the model still emits JSON.
+    """
+    # Unwrap AIMessage -> raw text
+    text = response.content if hasattr(response, "content") else str(response)
+    if isinstance(text, list):
+        text = " ".join(
+            p.get("text", "") if isinstance(p, dict) else str(p) for p in text
+        )
+
+    logger.info(
+        "_parse_memories_response: raw model output (%d chars):\n%s",
+        len(text),
+        text[:1500] + ("...[truncated]" if len(text) > 1500 else ""),
+    )
+
+    # Strip markdown code fences and numbered list prefixes
+    text = re.sub(r"```(?:json|text)?\s*", "", text).strip("`").strip()
+
+    # Primary path: line-based KIND::CONTENT format
+    memories = _parse_line_format(text)
+    if memories:
+        logger.info(
+            "_parse_memories_response: parsed %d memories via line format",
+            len(memories),
+        )
+        return ExtractedMemories(memories=memories)
+
+    # Fallback: JSON parsing (models that ignored the line-format instruction)
+    text_for_json = re.sub(r"(?m)^\s*\d+\.\s*", "", text)
+    for candidate in _json_candidates(text_for_json):
+        result = _try_load_memories(candidate)
+        if result is not None and result.memories:
+            logger.info(
+                "_parse_memories_response: parsed %d memories via JSON fallback",
+                len(result.memories),
+            )
+            return result
+
+    logger.warning(
+        "_parse_memories_response: extracted ZERO memories from model output"
+    )
+    return ExtractedMemories(memories=[])
+
+
+def _parse_line_format(text: str) -> list[ExtractedMemory]:
+    """Parse ``KIND::CONTENT`` lines into ExtractedMemory objects.
+
+    Lines without ``::`` are skipped. Lines with an unknown KIND fall back to
+    ``fact``. Empty content lines are dropped.
+    """
+    memories: list[ExtractedMemory] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        # Skip empty lines and obvious decorations
+        if not line or line.startswith(("#", "//", "---", "===")):
+            continue
+        # Strip optional list markers
+        line = re.sub(r"^\s*(?:[-*+]\s+|\d+[.)]\s+)", "", line)
+        if "::" not in line:
+            continue
+        kind_raw, _, content = line.partition("::")
+        content = content.strip().strip(",").strip('"').strip("'")
+        if not content:
+            continue
+        kind = kind_raw.strip().lower()
+        if kind not in _VALID_KINDS:
+            kind = "fact"
+        title = content[:80]
+        try:
+            memories.append(
+                ExtractedMemory(kind=kind, content=content, title=title)
+            )
+        except Exception as e:  # pragma: no cover - defensive
+            logger.debug("_parse_line_format: skipping malformed line %r: %s", line, e)
+    return memories
+
+
+def _json_candidates(text: str) -> list[str]:
+    """Return a list of JSON string candidates to try, most specific first."""
+    candidates = [text]
+    # Largest JSON array in the text
+    m = re.search(r"\[[\s\S]*\]", text, re.DOTALL)
+    if m:
+        candidates.append(m.group())
+    # Largest JSON object in the text
+    m2 = re.search(r"\{[\s\S]*\}", text, re.DOTALL)
+    if m2:
+        candidates.append(m2.group())
+    return candidates
+
+
+def _try_load_memories(text: str) -> ExtractedMemories | None:
+    """Try to parse *text* as JSON and coerce into ExtractedMemories. Returns None on failure."""
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+
+    if isinstance(data, list):
+        return ExtractedMemories.model_validate({"memories": data})
+    if isinstance(data, dict):
+        # Might be {"memories": [...]} or a single memory object
+        if "memories" in data:
+            return ExtractedMemories.model_validate(data)
+        # Single memory dict accidentally returned at top level
+        if "content" in data or "value" in data:
+            return ExtractedMemories.model_validate({"memories": [data]})
+    return None
+
+
+def _make_llm(temperature: float = 0.2, max_tokens: int | None = None) -> ChatOpenAI:
+    """Build a ChatOpenAI instance routed through OpenRouter.
 
     Requires ``OPENROUTER_API_KEY``. Override the model via ``LANGGRAPH_LLM``.
+    Called twice inside build_support_graph: once at temperature=0.2 for the
+    conversational responder, once at temperature=0.1 for the extractor.
+    Two separate instances are used because chaining .bind(temperature=0) onto
+    an existing ChatOpenAI before .with_structured_output() produces a
+    RunnableBinding that collapses to single-item output on some OpenRouter models.
+
+    ``max_tokens`` is needed for reasoning models like ``tencent/hy3-preview``
+    that consume tokens for an internal thinking phase before emitting visible
+    output. Without an explicit cap, OpenRouter reserves the model's full
+    context budget (65k+) and rejects the call when the API key's credit
+    limit can't cover that reservation.
     """
+    # Default: openai/gpt-oss-120b:free - fastest free model on OpenRouter
+    # for KIND::CONTENT line extraction. Benchmarked at ~3s for 5 facts.
+    # Free, no credits required. Subject to OpenRouter's shared free-tier
+    # rate limits; the graph's RetryPolicy handles 429s with 32s backoff.
+    # See .env.example for paid alternatives (tencent/hy3-preview etc).
     model = os.environ.get("LANGGRAPH_LLM", "openai/gpt-oss-120b:free")
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
@@ -110,12 +280,32 @@ def _default_llm() -> ChatOpenAI:
             "OPENROUTER_API_KEY is not set. Copy .env.example to .env and add "
             "your OpenRouter key (https://openrouter.ai/keys - free tier available)."
         )
-    return ChatOpenAI(
-        model=model,
-        temperature=0.2,
-        api_key=api_key,
-        base_url="https://openrouter.ai/api/v1",
-    )
+    kwargs: dict = {
+        "model": model,
+        "temperature": temperature,
+        "api_key": api_key,
+        "base_url": "https://openrouter.ai/api/v1",
+    }
+    if max_tokens is not None:
+        kwargs["max_tokens"] = max_tokens
+    return ChatOpenAI(**kwargs)
+
+
+# max_tokens cap on every LLM call. Reasoning models like tencent/hy3-preview
+# consume tokens for an internal thinking phase before emitting visible output,
+# and OpenRouter's pre-flight credit reservation rejects calls whose
+# max_tokens exceeds the remaining key budget. 7000 is the sweet spot:
+#   * enough thinking budget for tencent/hy3-preview to emit visible output
+#   * fits inside a $5+ OpenRouter key credit limit across multiple turns
+#   * non-reasoning models (gpt-oss-20b:free etc) use much less than this
+# If you see "extracted ZERO memories" with an empty model output: bump this,
+# OR increase your OpenRouter key's credit limit, OR switch to a free model.
+_DEFAULT_MAX_TOKENS = 7000
+
+
+def _default_llm() -> ChatOpenAI:
+    """Conversational LLM at temperature=0.2 (natural replies)."""
+    return _make_llm(temperature=0.2, max_tokens=_DEFAULT_MAX_TOKENS)
 
 
 def _user_id_from_config(config) -> str:
@@ -141,8 +331,26 @@ def build_support_graph(
         "thread_id": "...", "user_id": "..."}}``.
     """
     chat = llm or _default_llm()
-    # json_mode guarantees a valid JSON envelope even when the model is under load.
-    extractor = chat.with_structured_output(ExtractedMemories, method="json_mode")
+    # Separate extractor at temperature=0.1 (not 0) for reliable multi-item output.
+    # temperature=0 causes greedy single-token selection and the model stops after
+    # emitting the first (highest-confidence) memory item instead of all of them.
+    # 0.1 adds just enough entropy to traverse the full list without sacrificing
+    # accuracy. Responder stays at temperature=0.2 for natural replies.
+    # We instantiate a fresh ChatOpenAI (not chat.bind()) because bind() +
+    # with_structured_output() collapses to single-item output on some models.
+    extractor_llm = (
+        _make_llm(temperature=0.1, max_tokens=_DEFAULT_MAX_TOKENS)
+        if llm is None
+        else llm
+    )
+    # Do NOT use with_structured_output here. Free-tier OpenRouter models
+    # (e.g. openai/gpt-oss-120b:free) do not reliably support function/tool
+    # calling and return plain text instead of structured tool arguments.
+    # with_structured_output() routes through Pydantic's model_validate_json()
+    # which raises json_invalid on any non-standard format the model emits.
+    # Instead we pipe the raw AIMessage through _parse_memories_response which
+    # handles numbered lists, bare arrays, wrapped objects, and code fences.
+    extractor = extractor_llm | RunnableLambda(_parse_memories_response)
     # MemantoStore is created here and passed to compile(store=...) below.
     # LangGraph then injects it into any node that declares `*, store: BaseStore`.
     store = MemantoStore(client, agent_id)
@@ -215,14 +423,29 @@ def build_support_graph(
                 [
                     SystemMessage(
                         content=(
-                            "You are a memory extractor. From the user message, "
-                            "extract every atomic durable fact, preference, or "
-                            "commitment worth remembering long-term.\n"
-                            "Return an EMPTY memories list for greetings, vague "
-                            "questions, or small talk with nothing durable.\n"
-                            "Valid kinds: fact, preference, goal, decision, "
-                            "observation, instruction, relationship, context, "
-                            "commitment."
+                            "You are a fact extractor. Extract EVERY distinct fact "
+                            "from the user message and output them ONE PER LINE.\n\n"
+                            "OUTPUT FORMAT: each line is exactly\n"
+                            "    KIND::CONTENT\n"
+                            "where KIND is one of: fact, preference, instruction, "
+                            "commitment, goal, observation, relationship, context, "
+                            "decision\n\n"
+                            "RULES:\n"
+                            "- ONE fact per line. A message with 4 facts produces "
+                            "4 lines. A message with 1 fact produces 1 line.\n"
+                            "- NEVER combine multiple facts on the same line.\n"
+                            "- NO JSON, NO markdown, NO numbering, NO extra prose. "
+                            "Just KIND::CONTENT lines.\n"
+                            "- If the message is a pure greeting with zero facts, "
+                            "output nothing at all.\n\n"
+                            "EXAMPLE\n"
+                            "Input: I'm Bob, allergic to peanuts (epi-pen), email "
+                            "bob@example.com, never call.\n"
+                            "Output:\n"
+                            "fact::User's name is Bob\n"
+                            "fact::User is allergic to peanuts (requires epi-pen)\n"
+                            "fact::User's email is bob@example.com\n"
+                            "instruction::Never contact user by phone"
                         )
                     ),
                     HumanMessage(content=str(last_user_msg.content)),

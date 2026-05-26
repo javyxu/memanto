@@ -14,9 +14,11 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import hashlib
 import html
 import os
 import time
+from pathlib import Path
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -80,10 +82,43 @@ async def _fetch_memories(store, user_id: str):
     return await store.asearch((user_id, "memories"), query="*", limit=20)
 
 
-# ── Cached resources (built once per server process) ─────────────────────────
+async def _poll_for_memories(
+    store, user_id: str, prev_count: int, max_wait_s: float = 12.0
+):
+    """Wait for newly-stored memories to become searchable.
+
+    Memanto's aput returns as soon as the write is acknowledged; the
+    search index catches up asynchronously, taking up to several seconds.
+    We poll sparingly (every 3 s, up to 12 s) so we don't burn through
+    Memanto's Community-plan recall rate-limit budget. The MemantoStore
+    caches results internally, so a poll after the first non-zero result
+    is essentially free.
+    """
+    deadline = time.time() + max_wait_s
+    memories = await _fetch_memories(store, user_id)
+    while time.time() < deadline and len(memories) <= prev_count:
+        await asyncio.sleep(3.0)
+        memories = await _fetch_memories(store, user_id)
+    return memories
+
+
+# ── Cached resources ──────────────────────────────────────────────────────────
+# Cache key is a hash of graph.py so Streamlit's file-watcher auto-reload
+# does NOT silently keep the old compiled graph in memory. Whenever graph.py
+# changes the hash changes, _load() is called with a new argument, and
+# @st.cache_resource builds a fresh graph with the updated code.
+
+def _graph_hash() -> str:
+    """Short MD5 of graph.py. Changes here bust the @st.cache_resource."""
+    try:
+        src = (Path(__file__).parent / "graph.py").read_bytes()
+        return hashlib.md5(src).hexdigest()[:12]
+    except Exception:
+        return "0"
+
 
 @st.cache_resource(show_spinner="Connecting to Memanto...")
-def _load():
+def _load(_graph_version: str = ""):
     from graph import build_support_graph
     from memanto_setup import MemantoSetup
     from memanto_store import MemantoStore
@@ -116,14 +151,21 @@ if missing:
     )
     st.stop()
 
-graph, store = _load()
+graph, store = _load(_graph_version=_graph_hash())
 
 # ── Session state ─────────────────────────────────────────────────────────────
 
 
 def _init_session(ts: str | None = None) -> None:
-    """Initialise (or reset) all demo-scoped session state."""
-    suffix = ts or "init"
+    """Initialise (or reset) all demo-scoped session state.
+
+    A fresh timestamp suffix is used on every call so each Streamlit
+    browser session and every explicit reset starts with a clean
+    memory namespace. Cross-session recall is proven within the same
+    running Streamlit session (Session 1 tab -> Session 2 tab), not
+    across app restarts.
+    """
+    suffix = ts or str(int(time.time()))
     st.session_state.user_id = f"bob-{suffix}"
     st.session_state.s1_thread = f"streamlit-s1-{suffix}"
     st.session_state.s2_thread = f"streamlit-s2-{suffix}"
@@ -248,6 +290,16 @@ with chat_col:
     def _send(session_key: str, thread_id: str, prompt: str) -> None:
         """Append user message, invoke graph, append reply."""
         user_id = st.session_state.user_id
+        # Snapshot the current memory count so the poller knows how many
+        # new memories to wait for after this send.
+        try:
+            prev_mems = _run(
+                _fetch_memories(store, user_id), pool=_STORE_POOL, timeout=15
+            )
+            prev_count = len(prev_mems)
+        except Exception:
+            prev_count = 0
+
         st.session_state[session_key].append(("user", prompt))
         with st.chat_message("user"):
             st.markdown(prompt)
@@ -265,6 +317,21 @@ with chat_col:
                     reply = f"Error: {exc}"
             st.markdown(reply)
         st.session_state[session_key].append(("assistant", reply))
+
+        # Wait for Memanto to index all new memories. aput returns as soon as
+        # the write is acknowledged but the search index catches up async,
+        # so a single fixed sleep would miss memories that take longer than
+        # the sleep window. Polling waits until the count grows past prev_count
+        # and stays stable for two ticks (or until a 12 s timeout).
+        with st.spinner("Indexing new memories..."):
+            try:
+                _run(
+                    _poll_for_memories(store, user_id, prev_count=prev_count),
+                    pool=_STORE_POOL,
+                    timeout=30,
+                )
+            except Exception:
+                pass  # fall through to rerun even if polling fails
         st.rerun()  # refresh memory panel
 
     # ── Tab 1 ─────────────────────────────────────────────────────────────────
