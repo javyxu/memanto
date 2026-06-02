@@ -9,6 +9,7 @@ or real API keys.
 from __future__ import annotations
 
 import ast
+import fnmatch
 import os
 from pathlib import Path
 
@@ -37,12 +38,60 @@ def _called_attribute_names(tree: ast.Module) -> set[str]:
     return names
 
 
-def _string_literals(tree: ast.Module) -> list[str]:
-    values: list[str] = []
+def _add_node_names(tree: ast.Module) -> set[str]:
+    names: set[str] = set()
     for node in ast.walk(tree):
-        if isinstance(node, ast.Constant) and isinstance(node.value, str):
-            values.append(node.value)
-    return values
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        is_add_node = (
+            isinstance(func, ast.Attribute) and func.attr == 'add_node'
+        ) or (
+            isinstance(func, ast.Name) and func.id == 'add_node'
+        )
+        if not is_add_node:
+            continue
+        if (
+            node.args
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+        ):
+            names.add(node.args[0].value)
+        for keyword in node.keywords:
+            if (
+                keyword.arg == 'name'
+                and isinstance(keyword.value, ast.Constant)
+                and isinstance(keyword.value.value, str)
+            ):
+                names.add(keyword.value.value)
+    return names
+
+
+def _agent_id_default(path: Path) -> str | None:
+    tree = _parse(path)
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(
+            isinstance(target, ast.Name) and target.id == 'AGENT_ID'
+            for target in node.targets
+        ):
+            continue
+        value = node.value
+        if (
+            isinstance(value, ast.Call)
+            and isinstance(value.func, ast.Attribute)
+            and value.func.attr == 'getenv'
+        ):
+            if (
+                len(value.args) >= 2
+                and isinstance(value.args[1], ast.Constant)
+                and isinstance(value.args[1].value, str)
+            ):
+                return value.args[1].value
+        if isinstance(value, ast.Constant) and isinstance(value.value, str):
+            return value.value
+    return None
 
 
 def _assert(condition: bool, message: str) -> None:
@@ -98,7 +147,7 @@ def validate_memanto_tools() -> None:
 
 def validate_langgraph_flow() -> None:
     graph_tree = _parse(PACKAGE / "graph.py")
-    node_names = set(_string_literals(graph_tree))
+    node_names = _add_node_names(graph_tree)
     calls = _called_attribute_names(graph_tree)
 
     _assert("research" in node_names, "research node is not registered")

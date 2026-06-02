@@ -26,6 +26,15 @@ MOORCHEH_API_KEY = os.getenv("MOORCHEH_API_KEY", "")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 
 
+def _get_memanto_api_key() -> str:
+    '''Return the configured Memanto API key or fail with setup guidance.'''
+    if not MOORCHEH_API_KEY:
+        raise RuntimeError(
+            'MOORCHEH_API_KEY not set. Copy .env.example to .env and fill it in.'
+        )
+    return MOORCHEH_API_KEY
+
+
 # ---------------------------------------------------------------------------
 # LLM factory
 # ---------------------------------------------------------------------------
@@ -62,7 +71,7 @@ def _build_memanto_remember_tool(agent_id: str):
         """Store a structured memory in Memanto for later cross-session recall."""
         result = _memanto_remember(
             state={"memanto_agent_id": agent_id},
-            api_key=MOORCHEH_API_KEY,
+            api_key=_get_memanto_api_key(),
             memory_type=memory_type or "observation",
             title=(title or "")[:100],
             content=(content or "")[:500],
@@ -128,8 +137,8 @@ def research_agent(state: Dict[str, Any]) -> Dict[str, Any]:
             title = args.get("title", "unknown")
             findings.append(title)
 
-    all_messages = [{"role": "assistant", "content": content}]
-    all_messages.extend(tool_results)
+    all_messages = list(tool_results)
+    all_messages.append({"role": "assistant", "content": content})
 
     return {
         "messages": all_messages,
@@ -151,7 +160,7 @@ def writer_agent(state: Dict[str, Any]) -> Dict[str, Any]:
     # First, recall memories
     recall_result = memanto_recall(
         state={**state, "memanto_agent_id": agent_id},
-        api_key=MOORCHEH_API_KEY,
+        api_key=_get_memanto_api_key(),
         query=f"research findings about {topic}",
         limit=10,
     )
@@ -159,7 +168,7 @@ def writer_agent(state: Dict[str, Any]) -> Dict[str, Any]:
     # Then answer a synthesis question
     answer_result = memanto_answer(
         state={**state, "memanto_agent_id": agent_id},
-        api_key=MOORCHEH_API_KEY,
+        api_key=_get_memanto_api_key(),
         question=f"Provide a detailed summary of all research findings about {topic}",
     )
 

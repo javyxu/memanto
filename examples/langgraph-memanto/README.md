@@ -59,7 +59,7 @@ python validate_offline.py
 
 ## File Structure
 
-```
+```text
 examples/langgraph-memanto/
 ├── README.md                  # This file
 ├── requirements.txt           # Python dependencies
@@ -102,7 +102,7 @@ compatible with LangGraph's function-based node model:
 
 ### Graph Structure
 
-```
+```text
 research_graph:
   topic → [research_agent] → remember_findings → writer_agent → recall_findings → done
                          ↑                      ↓
