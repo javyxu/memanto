@@ -1385,6 +1385,279 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* ── History (GitHub-style contribution graph + timeline) ── */
+        .hh-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .hh-stat {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 14px 16px;
+        }
+
+        .hh-stat-label {
+            font-size: 11px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .hh-stat-value {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-top: 4px;
+        }
+
+        .hh-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-x: auto;
+            padding: 4px 2px;
+        }
+
+        .hh-months {
+            display: grid;
+            grid-template-columns: 28px repeat(53, 14px);
+            column-gap: 0;
+            font-size: 11px;
+            color: var(--text-dim);
+            height: 14px;
+        }
+
+        .hh-months span {
+            grid-row: 1;
+        }
+
+        .hh-grid-wrap {
+            display: flex;
+            gap: 4px;
+        }
+
+        .hh-day-labels {
+            display: grid;
+            grid-template-rows: repeat(7, 14px);
+            font-size: 10px;
+            color: var(--text-dim);
+            width: 24px;
+            line-height: 14px;
+        }
+
+        .hh-weeks {
+            display: grid;
+            grid-auto-flow: column;
+            grid-auto-columns: 11px;
+            grid-template-rows: repeat(7, 11px);
+            column-gap: 3px;
+            row-gap: 3px;
+        }
+
+        .hh-cell {
+            width: 11px;
+            height: 11px;
+            border-radius: 2px;
+            cursor: pointer;
+            transition: transform 0.1s;
+            display: inline-block;
+        }
+
+        .hh-cell[data-level="0"] {
+            background: #161b22;
+            outline: 1px solid rgba(255, 255, 255, 0.03);
+            outline-offset: -1px;
+        }
+
+        .hh-cell[data-level="1"] {
+            background: #0e4429;
+        }
+
+        .hh-cell[data-level="2"] {
+            background: #006d32;
+        }
+
+        .hh-cell[data-level="3"] {
+            background: #26a641;
+        }
+
+        .hh-cell[data-level="4"] {
+            background: #39d353;
+        }
+
+        .hh-cell:hover {
+            outline: 1px solid rgba(255, 255, 255, 0.6);
+            outline-offset: 1px;
+        }
+
+        .hh-cell.selected {
+            outline: 2px solid var(--accent);
+            outline-offset: 1px;
+        }
+
+        .hh-legend {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            color: var(--text-dim);
+            justify-content: flex-end;
+            margin-top: 4px;
+        }
+
+        .hh-legend .hh-cell {
+            cursor: default;
+        }
+
+        .hh-timeline {
+            position: relative;
+            padding-left: 28px;
+        }
+
+        .hh-timeline::before {
+            content: '';
+            position: absolute;
+            left: 9px;
+            top: 16px;
+            bottom: 16px;
+            width: 2px;
+            background: var(--border);
+        }
+
+        .hh-tl-date {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin: 22px 0 10px -28px;
+            padding-left: 28px;
+            position: relative;
+        }
+
+        .hh-tl-date:first-child {
+            margin-top: 4px;
+        }
+
+        .hh-tl-date::before {
+            content: '';
+            position: absolute;
+            left: 4px;
+            top: 4px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent);
+            border: 3px solid var(--bg-primary);
+            box-shadow: 0 0 0 1px var(--accent);
+        }
+
+        .hh-tl-item {
+            position: relative;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 12px 14px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: background var(--transition), border-color var(--transition);
+        }
+
+        .hh-tl-item::before {
+            content: '';
+            position: absolute;
+            left: -19px;
+            top: 18px;
+            width: 14px;
+            height: 2px;
+            background: var(--border);
+        }
+
+        .hh-tl-item:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border-hover);
+        }
+
+        .hh-tl-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .hh-tl-hash {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-secondary);
+            background: var(--bg-surface);
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+        }
+
+        .hh-tl-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            flex: 1;
+            min-width: 0;
+        }
+
+        .hh-tl-meta {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-top: 8px;
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .hh-tl-tag {
+            background: var(--accent-glow);
+            color: var(--accent);
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 500;
+            letter-spacing: 0.2px;
+        }
+
+        .hh-tl-time {
+            margin-left: auto;
+            font-family: var(--font-mono);
+        }
+
+        .hh-tl-content {
+            margin-top: 10px;
+            padding: 10px 12px;
+            background: var(--bg-surface);
+            border-radius: var(--radius-xs);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            display: none;
+            border: 1px solid var(--border);
+        }
+
+        .hh-tl-item.expanded .hh-tl-content {
+            display: block;
+        }
+
+        .hh-empty {
+            padding: 40px;
+            text-align: center;
+            color: var(--text-dim);
+        }
+
+        .hh-cap-note {
+            font-size: 11px;
+            color: var(--text-dim);
+            font-weight: 400;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
@@ -1431,6 +1704,13 @@
                         <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                     <span>Explorer</span>
+                </button>
+                <button class="nav-item" data-page="history">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    <span>History</span>
                 </button>
                 <button class="nav-item" data-page="conflicts">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1678,6 +1958,20 @@
                 <div id="connectionDetails"></div>
             </section>
 
+            <!-- HISTORY -->
+            <section class="page" id="page-history">
+                <div class="page-header">
+                    <h2>Memory History</h2>
+                    <p>Contribution graph and timeline of stored memories</p>
+                </div>
+                <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+                    <button class="btn btn-secondary btn-sm" onclick="loadHistory()">Refresh</button>
+                </div>
+                <div id="historyContent">
+                    <div class="loading-overlay"><span class="spinner"></span> Loading history...</div>
+                </div>
+            </section>
+
             <!-- CONFIG -->
             <section class="page" id="page-config">
                 <div class="page-header">
@@ -1802,6 +2096,7 @@
                 if (btn.dataset.page === 'dashboard') loadDashboard();
                 if (btn.dataset.page === 'conflicts') loadConflicts();
                 if (btn.dataset.page === 'connections') loadConnections();
+                if (btn.dataset.page === 'history' && !S._historyLoaded) { loadHistory(); S._historyLoaded = true; }
             });
         });
 
@@ -2274,6 +2569,215 @@
             return html;
         }
         function toggleRow(id) { const r = document.getElementById(id); if (r) r.classList.toggle('open'); }
+
+        // ================================================================
+        // HISTORY (GitHub-style contribution graph + timeline)
+        // ================================================================
+
+        // Parse a memanto created_at to a local Date. Backend emits naive UTC
+        // timestamps (no Z/offset) — append Z so they aren't read as local time.
+        function parseMemDate(s) {
+            if (!s) return null;
+            let v = s;
+            if (typeof v === 'string' && v.includes('T') && !/[Zz]$|[+-]\d{2}:?\d{2}$/.test(v)) v = v + 'Z';
+            const d = new Date(v);
+            return isNaN(d.getTime()) ? null : d;
+        }
+
+        function dayKey(d) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        function levelForCount(n) {
+            if (!n) return 0;
+            if (n === 1) return 1;
+            if (n <= 3) return 2;
+            if (n <= 7) return 3;
+            return 4;
+        }
+
+        async function loadHistory() {
+            const box = document.getElementById('historyContent');
+            if (!S.agentId || !S.token) {
+                box.innerHTML = '<p style="color:var(--text-dim);padding:20px">No active agent. <a href="#" onclick="goToPage(\'agents\');return false" style="color:var(--accent);text-decoration:none">Go to the Agents page</a> to activate one.</p>';
+                return;
+            }
+            box.innerHTML = '<div class="loading-overlay"><span class="spinner"></span> Loading history...</div>';
+            try {
+                const res = await api('POST', `/api/v2/agents/${S.agentId}/recall/recent`, { limit: 100 });
+                S.history = res.memories || [];
+                S.historyFilter = null;
+                renderHistory();
+            } catch (e) {
+                box.innerHTML = `<p style="color:var(--error);padding:20px">Error: ${e.message}</p>`;
+            }
+        }
+
+        function renderHistory() {
+            const mems = S.history || [];
+            const box = document.getElementById('historyContent');
+
+            // Bucket by local day
+            const byDay = new Map();
+            mems.forEach(m => {
+                const d = parseMemDate(m.created_at);
+                if (!d) return;
+                const k = dayKey(d);
+                if (!byDay.has(k)) byDay.set(k, []);
+                byDay.get(k).push(m);
+            });
+
+            // 53-week window ending the upcoming Saturday
+            const today = new Date(); today.setHours(0, 0, 0, 0);
+            const endDate = new Date(today);
+            endDate.setDate(endDate.getDate() + (6 - endDate.getDay()));
+            const startDate = new Date(endDate);
+            startDate.setDate(startDate.getDate() - (53 * 7 - 1));
+
+            const weeks = [];
+            const cur = new Date(startDate);
+            while (cur <= endDate) {
+                const week = [];
+                for (let i = 0; i < 7; i++) {
+                    const k = dayKey(cur);
+                    const count = (byDay.get(k) || []).length;
+                    week.push({ date: new Date(cur), key: k, count });
+                    cur.setDate(cur.getDate() + 1);
+                }
+                weeks.push(week);
+            }
+
+            // Stats
+            const total = mems.length;
+            const activeDays = [...byDay.values()].filter(v => v.length > 0).length;
+            const maxDay = activeDays ? Math.max(...[...byDay.values()].map(v => v.length)) : 0;
+            // Longest streak: scan day keys, count consecutive runs
+            const dayKeys = [...byDay.keys()].sort();
+            let longest = 0;
+            let run = 0;
+            let prev = null;
+            dayKeys.forEach(k => {
+                const d = new Date(k);
+                if (prev) {
+                    const diff = Math.round((d - prev) / 86400000);
+                    run = diff === 1 ? run + 1 : 1;
+                } else { run = 1; }
+                if (run > longest) longest = run;
+                prev = d;
+            });
+
+            // Month labels — show when month changes between consecutive weeks
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            const monthLabels = weeks.map((week, i) => {
+                const monthThis = week[0].date.getMonth();
+                const monthPrev = i > 0 ? weeks[i - 1][0].date.getMonth() : -1;
+                return monthThis !== monthPrev ? monthNames[monthThis] : '';
+            });
+
+            const headlineCount = [...byDay.values()].reduce((s, v) => s + v.length, 0);
+
+            let html = '';
+            html += `<div class="hh-stats">
+                <div class="hh-stat"><div class="hh-stat-label">Total memories</div><div class="hh-stat-value">${total}</div></div>
+                <div class="hh-stat"><div class="hh-stat-label">Active days</div><div class="hh-stat-value">${activeDays}</div></div>
+                <div class="hh-stat"><div class="hh-stat-label">Most in a day</div><div class="hh-stat-value">${maxDay}</div></div>
+                <div class="hh-stat"><div class="hh-stat-label">Longest streak</div><div class="hh-stat-value">${longest}</div></div>
+            </div>`;
+
+            html += `<div class="panel">
+                <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+                    <span>${headlineCount} ${headlineCount === 1 ? 'memory' : 'memories'} in the last year <span class="hh-cap-note">(showing latest ${total} fetched; API capped at 100)</span></span>
+                </div>
+                <div class="hh-container">
+                    <div class="hh-months"><span></span>${monthLabels.map(l => `<span>${l}</span>`).join('')}</div>
+                    <div class="hh-grid-wrap">
+                        <div class="hh-day-labels"><span></span><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span></div>
+                        <div class="hh-weeks">${weeks.map(week => week.map(d => `<div class="hh-cell${S.historyFilter === d.key ? ' selected' : ''}" data-level="${levelForCount(d.count)}" data-key="${d.key}" title="${d.count} ${d.count === 1 ? 'memory' : 'memories'} on ${d.date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}" onclick="filterHistoryByDay('${d.key}')"></div>`).join('')).join('')}</div>
+                    </div>
+                    <div class="hh-legend">
+                        <span>Less</span>
+                        <span class="hh-cell" data-level="0"></span>
+                        <span class="hh-cell" data-level="1"></span>
+                        <span class="hh-cell" data-level="2"></span>
+                        <span class="hh-cell" data-level="3"></span>
+                        <span class="hh-cell" data-level="4"></span>
+                        <span>More</span>
+                    </div>
+                </div>
+            </div>`;
+
+            html += `<div class="panel">
+                <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+                    <span>Timeline${S.historyFilter ? ` — ${S.historyFilter}` : ''}</span>
+                    ${S.historyFilter ? `<button class="btn btn-secondary btn-sm" onclick="clearHistoryFilter()">Clear filter</button>` : ''}
+                </div>
+                ${total === 0
+                    ? '<div class="hh-empty">No memories yet. Store one from the Playground to see it here.</div>'
+                    : `<div class="hh-timeline">${buildHistoryTimeline(byDay)}</div>`}
+            </div>`;
+
+            box.innerHTML = html;
+        }
+
+        function buildHistoryTimeline(byDay) {
+            const filter = S.historyFilter;
+            let dates = [...byDay.keys()].sort().reverse();
+            if (filter) dates = dates.filter(d => d === filter);
+            if (!dates.length) {
+                return '<div class="hh-empty">No memories on the selected date</div>';
+            }
+
+            let html = '';
+            dates.forEach(dateKey => {
+                const list = byDay.get(dateKey).slice().sort((a, b) => {
+                    const da = parseMemDate(a.created_at)?.getTime() || 0;
+                    const db = parseMemDate(b.created_at)?.getTime() || 0;
+                    return db - da;
+                });
+                const headerDate = parseMemDate(list[0].created_at);
+                const dateLabel = headerDate
+                    ? headerDate.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+                    : dateKey;
+                html += `<div class="hh-tl-date">${dateLabel}</div>`;
+                list.forEach(m => {
+                    const shortId = (m.id || '').toString().substring(0, 7) || '———';
+                    const tags = Array.isArray(m.tags) ? m.tags.filter(Boolean) : [];
+                    const t = parseMemDate(m.created_at);
+                    const time = t ? t.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
+                    const conf = (parseFloat(m.confidence) || 0).toFixed(2);
+                    const meta = [];
+                    if (m.type) meta.push(`<span class="badge badge-info">${escHtml(m.type)}</span>`);
+                    if (m.source) meta.push(`<span class="badge badge-accent">${escHtml(m.source)}</span>`);
+                    if (m.provenance) meta.push(`<span class="badge badge-accent">${escHtml(m.provenance)}</span>`);
+                    tags.forEach(tg => meta.push(`<span class="hh-tl-tag">${escHtml(tg)}</span>`));
+                    html += `<div class="hh-tl-item" onclick="this.classList.toggle('expanded')">
+                        <div class="hh-tl-row">
+                            <span class="hh-tl-hash" title="${escHtml(m.id || '')}">${escHtml(shortId)}</span>
+                            <span class="hh-tl-title">${escHtml(m.title || 'Untitled')}</span>
+                        </div>
+                        <div class="hh-tl-meta">
+                            ${meta.join('')}
+                            <span class="hh-tl-time">${time} · conf ${conf}</span>
+                        </div>
+                        <div class="hh-tl-content">${escHtml(m.content || m.text || 'No content')}</div>
+                    </div>`;
+                });
+            });
+            return html;
+        }
+
+        function filterHistoryByDay(key) {
+            S.historyFilter = (S.historyFilter === key) ? null : key;
+            renderHistory();
+        }
+
+        function clearHistoryFilter() {
+            S.historyFilter = null;
+            renderHistory();
+        }
 
         // ================================================================
         // CONFIG
