@@ -1,6 +1,6 @@
 """
 Schedule Manager for MEMANTO
-Handles OS-level scheduling for daily summaries.
+Handles OS-level scheduling for conflict detection.
 """
 
 import platform
@@ -13,7 +13,11 @@ from typing import Any
 class ScheduleManager:
     """Manages OS-level scheduled tasks for MEMANTO"""
 
-    TASK_NAME = "MemantoDailySummary"
+    TASK_NAME = "MemantoConflictDetection"
+    # Legacy task name from the era when the schedule ran daily-summary.
+    # Cleared on enable/disable so users upgrading don't end up with two jobs.
+    LEGACY_TASK_NAMES = ("MemantoDailySummary",)
+    SCHEDULED_COMMAND = "detect-conflicts"
 
     def __init__(self):
         self.os_type = platform.system()
@@ -46,9 +50,21 @@ class ScheduleManager:
     # Windows Implementation (schtasks)
 
     def _enable_windows(self, time_str: str = "23:55") -> dict[str, Any]:
-        # Command to run: python <main_path> daily-summary
+        # Drop any stale schedule from the previous task name so users
+        # upgrading from the daily-summary era don't keep both jobs.
+        for legacy in self.LEGACY_TASK_NAMES:
+            subprocess.run(
+                ["schtasks", "/delete", "/tn", legacy, "/f"],
+                capture_output=True,
+                text=True,
+            )
+
+        # Command to run: python <main_path> detect-conflicts
         # We use absolute paths to avoid issues with working directories
-        cmd_to_run = f'"{self.python_exe}" "{self.cli_main.absolute()}" daily-summary'
+        cmd_to_run = (
+            f'"{self.python_exe}" "{self.cli_main.absolute()}" '
+            f"{self.SCHEDULED_COMMAND}"
+        )
 
         # schtasks command
         # /sc daily: schedule daily
@@ -81,6 +97,14 @@ class ScheduleManager:
             }
 
     def _disable_windows(self) -> dict[str, Any]:
+        # Best-effort cleanup of any legacy task too.
+        for legacy in self.LEGACY_TASK_NAMES:
+            subprocess.run(
+                ["schtasks", "/delete", "/tn", legacy, "/f"],
+                capture_output=True,
+                text=True,
+            )
+
         command = ["schtasks", "/delete", "/tn", self.TASK_NAME, "/f"]
         try:
             subprocess.run(command, capture_output=True, text=True, check=True)
@@ -101,12 +125,12 @@ class ScheduleManager:
             return {
                 "enabled": True,
                 "details": result.stdout,
-                "message": "Daily summary scheduling is ENABLED.",
+                "message": "Conflict detection scheduling is ENABLED.",
             }
         except subprocess.CalledProcessError:
             return {
                 "enabled": False,
-                "message": "Daily summary scheduling is DISABLED.",
+                "message": "Conflict detection scheduling is DISABLED.",
             }
 
     # Unix/OSX Implementation (crontab)
@@ -119,7 +143,10 @@ class ScheduleManager:
         except (ValueError, IndexError):
             hour, minute = 23, 55
 
-        cron_entry = f'{minute} {hour} * * * "{self.python_exe}" "{self.cli_main.absolute()}" daily-summary'
+        cron_entry = (
+            f'{minute} {hour} * * * "{self.python_exe}" '
+            f'"{self.cli_main.absolute()}" {self.SCHEDULED_COMMAND}'
+        )
 
         try:
             # Get current crontab
@@ -127,9 +154,13 @@ class ScheduleManager:
                 ["crontab", "-l"], capture_output=True, text=True
             ).stdout
 
-            # Remove existing MEMANTO entry if any
+            # Remove existing MEMANTO entries (current and legacy daily-summary).
             lines = current_cron.splitlines()
-            lines = [line for line in lines if "daily-summary" not in line]
+            lines = [
+                line
+                for line in lines
+                if self.SCHEDULED_COMMAND not in line and "daily-summary" not in line
+            ]
 
             # Add new entry
             new_cron = "\n".join(lines).rstrip() + "\n" + cron_entry + "\n"
@@ -149,11 +180,13 @@ class ScheduleManager:
             ).stdout
             lines = current_cron.splitlines()
 
-            # Filter out our entry
+            # Filter out our entry (and any legacy daily-summary entry).
             new_lines = [
                 line
                 for line in lines
-                if f"{self.TASK_NAME}" not in line and "daily-summary" not in line
+                if f"{self.TASK_NAME}" not in line
+                and self.SCHEDULED_COMMAND not in line
+                and "daily-summary" not in line
             ]
 
             if len(new_lines) == len(lines):
@@ -170,17 +203,17 @@ class ScheduleManager:
             current_cron = subprocess.run(
                 ["crontab", "-l"], capture_output=True, text=True
             ).stdout
-            if "daily-summary" in current_cron:
+            if self.SCHEDULED_COMMAND in current_cron:
                 return {
                     "enabled": True,
-                    "message": "Daily summary scheduling is ENABLED (cron).",
+                    "message": "Conflict detection scheduling is ENABLED (cron).",
                 }
             return {
                 "enabled": False,
-                "message": "Daily summary scheduling is DISABLED.",
+                "message": "Conflict detection scheduling is DISABLED.",
             }
         except Exception:
             return {
                 "enabled": False,
-                "message": "Daily summary scheduling is DISABLED.",
+                "message": "Conflict detection scheduling is DISABLED.",
             }

@@ -572,6 +572,120 @@ async def answer(
         raise map_error_to_http_exception(e)
 
 
+class DailySummaryRequest(BaseModel):
+    date: str | None = Field(
+        default=None,
+        description="Date string YYYY-MM-DD. Defaults to today.",
+    )
+    output_path: str | None = Field(
+        default=None,
+        description="Optional custom output path for the summary MD file.",
+    )
+
+
+class ConflictDetectRequest(BaseModel):
+    date: str | None = Field(
+        default=None,
+        description="Date string YYYY-MM-DD. Defaults to today.",
+    )
+
+
+@router.post("/{agent_id}/daily-summary")
+async def generate_daily_summary(
+    agent_id: str,
+    request: DailySummaryRequest = Body(default_factory=DailySummaryRequest),
+    session: Session = Depends(get_current_session),
+):
+    """
+    Generate the on-demand daily AI summary for an agent/date.
+
+    Conflict detection is a separate concern — see
+    POST ``/{agent_id}/conflicts/generate`` or the scheduled job.
+    """
+    if session.agent_id != agent_id:
+        raise map_error_to_http_exception(
+            Exception(
+                f"Session is for agent '{session.agent_id}', cannot access '{agent_id}'"
+            )
+        )
+
+    from memanto.app.clients.backend import Backend, parse_backend
+
+    if parse_backend(settings.MEMANTO_BACKEND) == Backend.ON_PREM:
+        raise HTTPException(
+            status_code=501,
+            detail=(
+                "daily-summary uses the LLM Answer endpoint, which is not "
+                "available on the on-prem backend. "
+                "Switch with: memanto config backend cloud"
+            ),
+        )
+
+    resolved_date = request.date or datetime.now().strftime("%Y-%m-%d")
+    try:
+        result = await asyncio.to_thread(
+            DirectClient(settings.MOORCHEH_API_KEY).generate_daily_summary,
+            agent_id,
+            resolved_date,
+            request.output_path,
+        )
+        return {
+            "agent_id": agent_id,
+            "session_id": session.session_id,
+            "date": resolved_date,
+            **result,
+        }
+    except Exception as e:
+        raise map_error_to_http_exception(e)
+
+
+@router.post("/{agent_id}/conflicts/generate")
+async def generate_conflict_report(
+    agent_id: str,
+    request: ConflictDetectRequest = Body(default_factory=ConflictDetectRequest),
+    session: Session = Depends(get_current_session),
+):
+    """
+    Generate the conflict report for an agent/date.
+
+    This is the same work the scheduled task performs.
+    """
+    if session.agent_id != agent_id:
+        raise map_error_to_http_exception(
+            Exception(
+                f"Session is for agent '{session.agent_id}', cannot access '{agent_id}'"
+            )
+        )
+
+    from memanto.app.clients.backend import Backend, parse_backend
+
+    if parse_backend(settings.MEMANTO_BACKEND) == Backend.ON_PREM:
+        raise HTTPException(
+            status_code=501,
+            detail=(
+                "conflict detection uses the LLM Answer endpoint, which is not "
+                "available on the on-prem backend. "
+                "Switch with: memanto config backend cloud"
+            ),
+        )
+
+    resolved_date = request.date or datetime.now().strftime("%Y-%m-%d")
+    try:
+        result = await asyncio.to_thread(
+            DirectClient(settings.MOORCHEH_API_KEY).generate_conflict_report,
+            agent_id,
+            resolved_date,
+        )
+        return {
+            "agent_id": agent_id,
+            "session_id": session.session_id,
+            "date": resolved_date,
+            **result,
+        }
+    except Exception as e:
+        raise map_error_to_http_exception(e)
+
+
 @router.get("/{agent_id}/conflicts")
 async def list_conflicts(
     agent_id: str,

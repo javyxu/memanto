@@ -1937,6 +1937,10 @@
                     <h2>Conflict Resolution</h2>
                     <p>Review and resolve contradicting memories</p>
                 </div>
+                <div style="display:flex;gap:10px;margin-bottom:18px">
+                    <button class="btn btn-primary btn-sm" id="btnDetectConflicts" onclick="detectConflictsNow()">⚡ Detect Conflicts Now</button>
+                    <button class="btn btn-secondary btn-sm" onclick="loadConflicts()">Refresh</button>
+                </div>
                 <div id="conflictsContent">
                     <div class="loading-overlay"><span class="spinner"></span> Loading conflicts...</div>
                 </div>
@@ -2938,7 +2942,7 @@
             <!-- SCHEDULE -->
             <div class="panel">
                 <div class="panel-title">📅 Schedule</div>
-                <div class="form-group"><label>Daily Summary & Conflict Scan Time (HH:MM)</label><input id="cfgSchedule" value="${c.schedule_time || '23:55'}" placeholder="HH:MM" style="width:120px"></div>
+                <div class="form-group"><label>Conflict Detection Time (HH:MM)</label><input id="cfgSchedule" value="${c.schedule_time || '23:55'}" placeholder="HH:MM" style="width:120px"></div>
             </div>
             <!-- SAVE -->
             <div style="display:flex;gap:12px;margin-top:8px">
@@ -3039,6 +3043,34 @@
         // ================================================================
         // CONFLICTS
         // ================================================================
+        async function detectConflictsNow() {
+            const btn = document.getElementById('btnDetectConflicts');
+            const prev = btn ? btn.innerHTML : null;
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Detecting...'; }
+            try {
+                const data = await api('POST', '/api/ui/conflicts/generate', {});
+                const status = (data.conflicts && data.conflicts.status) || 'unknown';
+                if (status === 'success') {
+                    const count = (data.conflicts && data.conflicts.conflict_count) || 0;
+                    toast(count > 0
+                        ? `Conflict detection complete: ${count} conflict(s) found.`
+                        : 'Conflict detection complete: no conflicts found.');
+                } else if (status === 'no_sessions') {
+                    toast('No sessions found for the selected date.', 'warning');
+                } else if (status === 'skipped_on_prem') {
+                    toast('Conflict detection is cloud-only — switch backend with: memanto config backend cloud', 'error');
+                } else {
+                    toast(`Conflict detection finished with status: ${status}`, 'warning');
+                }
+                await loadConflicts();
+                if (typeof loadConflictBadge === 'function') loadConflictBadge();
+            } catch (e) {
+                toast('Failed to detect conflicts: ' + e.message, 'error');
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = prev; }
+            }
+        }
+
         async function loadConflicts() {
             const container = document.getElementById('conflictsContent');
             container.innerHTML = '<div class="loading-overlay"><span class="spinner"></span> Loading conflicts...</div>';
@@ -3052,7 +3084,7 @@
                 <div style="text-align:center;padding:60px 20px">
                     <div style="font-size:48px;margin-bottom:16px;opacity:0.3">✓</div>
                     <p style="color:var(--success);font-size:16px;font-weight:600;margin-bottom:8px">No Conflicts</p>
-                    <p style="color:var(--text-dim);font-size:13px">All memories are consistent. Run <code style="font-family:var(--font-mono);color:var(--accent)">memanto daily-summary</code> to check for new conflicts.</p>
+                    <p style="color:var(--text-dim);font-size:13px">All memories are consistent. Click <strong>Detect Conflicts Now</strong> above (or run <code style="font-family:var(--font-mono);color:var(--accent)">memanto detect-conflicts</code>) to scan for new conflicts.</p>
                 </div>`;
                     return;
                 }

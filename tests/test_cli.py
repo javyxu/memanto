@@ -367,18 +367,26 @@ class TestMEMANTOCLI:
         assert "Stored 2/2 memories successfully" in result.stdout
 
     def test_daily_summary(self, mock_all_clients):
-        """Test 'memanto daily-summary'"""
+        """Test 'memanto daily-summary' (summary only — no conflicts)."""
         mock_all_clients.generate_daily_summary.return_value = {
             "summary": {"status": "success", "summary_path": "summary.md"},
+        }
+        result = runner.invoke(app, ["daily-summary"])
+        assert result.exit_code == 0
+        assert "generated" in result.stdout.lower()
+
+    def test_detect_conflicts(self, mock_all_clients):
+        """Test 'memanto detect-conflicts'"""
+        mock_all_clients.generate_conflict_report.return_value = {
             "conflicts": {
                 "status": "success",
                 "conflict_count": 0,
                 "json_path": "conflicts.json",
             },
         }
-        result = runner.invoke(app, ["daily-summary"])
+        result = runner.invoke(app, ["detect-conflicts"])
         assert result.exit_code == 0
-        assert "generated" in result.stdout.lower()
+        assert "conflict report generated" in result.stdout.lower()
 
     def test_conflicts_list(self, mock_all_clients):
         """Test 'memanto conflicts --list'"""

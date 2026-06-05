@@ -187,6 +187,75 @@ async def list_conflicts(agent_id: str | None = None, date: str | None = None):
         return {"conflicts": [], "count": 0, "error": str(e)}
 
 
+@router.post("/api/ui/daily-summary")
+async def generate_daily_summary(body: dict | None = None):
+    """
+    Trigger an on-demand daily summary for the active agent.
+    Expects (optional): {"agent_id": "...", "date": "YYYY-MM-DD",
+                         "output_path": "..."}
+    """
+    from datetime import datetime as dt
+
+    body = body or {}
+    agent_id = body.get("agent_id")
+    if not agent_id:
+        aid, _ = _config_manager.get_active_session()
+        if not aid:
+            raise HTTPException(status_code=400, detail="No active agent")
+        agent_id = aid
+    date = body.get("date") or dt.now().strftime("%Y-%m-%d")
+    output_path = body.get("output_path")
+
+    api_key = _config_manager.get_api_key()
+    if not api_key:
+        raise HTTPException(status_code=400, detail="No API key configured")
+
+    try:
+        client = DirectClient(api_key)
+        _, token = _config_manager.get_active_session()
+        if token:
+            client.session_token = token
+        result = client.generate_daily_summary(
+            agent_id=str(agent_id), date=str(date), output_path=output_path
+        )
+        return {"agent_id": agent_id, "date": date, **result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/api/ui/conflicts/generate")
+async def generate_conflict_report(body: dict | None = None):
+    """
+    Trigger an on-demand conflict report for the active agent. This is the
+    same work the scheduled task performs.
+    Expects (optional): {"agent_id": "...", "date": "YYYY-MM-DD"}
+    """
+    from datetime import datetime as dt
+
+    body = body or {}
+    agent_id = body.get("agent_id")
+    if not agent_id:
+        aid, _ = _config_manager.get_active_session()
+        if not aid:
+            raise HTTPException(status_code=400, detail="No active agent")
+        agent_id = aid
+    date = body.get("date") or dt.now().strftime("%Y-%m-%d")
+
+    api_key = _config_manager.get_api_key()
+    if not api_key:
+        raise HTTPException(status_code=400, detail="No API key configured")
+
+    try:
+        client = DirectClient(api_key)
+        _, token = _config_manager.get_active_session()
+        if token:
+            client.session_token = token
+        result = client.generate_conflict_report(agent_id=str(agent_id), date=str(date))
+        return {"agent_id": agent_id, "date": date, **result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/api/ui/conflicts/resolve")
 async def resolve_conflict(body: dict):
     """

@@ -17,7 +17,7 @@ from memanto.cli.schedule_manager import ScheduleManager
 
 @schedule_app.command("enable")
 def schedule_enable():
-    """Enable daily AI summary generation at configured time."""
+    """Enable daily conflict detection at configured time."""
 
     manager = ScheduleManager()
 
@@ -33,7 +33,7 @@ def schedule_enable():
 
 @schedule_app.command("disable")
 def schedule_disable():
-    """Disable auto-generated daily summaries."""
+    """Disable auto conflict detection."""
 
     manager = ScheduleManager()
     result = manager.disable()
@@ -46,7 +46,7 @@ def schedule_disable():
 
 @schedule_app.command("status")
 def schedule_status():
-    """Check the status of the daily summary schedule."""
+    """Check the status of the conflict detection schedule."""
 
     manager = ScheduleManager()
     result = manager.get_status()
@@ -55,9 +55,10 @@ def schedule_status():
     if result.get("enabled"):
         console.print(
             Panel(
-                f"[green]Daily Summary Automation: ENABLED[/green]\n\n"
+                f"[green]Conflict Detection Automation: ENABLED[/green]\n\n"
                 f"[dim]Time: {configured_time} local time daily[/dim]\n"
-                f"[dim]Command: {manager.python_exe} ... daily-summary[/dim]",
+                f"[dim]Command: {manager.python_exe} ... "
+                f"{manager.SCHEDULED_COMMAND}[/dim]",
                 title="Schedule Status",
                 border_style=SUCCESS,
             )
@@ -65,8 +66,9 @@ def schedule_status():
     else:
         console.print(
             Panel(
-                "[yellow]Daily Summary Automation: DISABLED[/yellow]\n\n"
-                "[dim]Run 'memanto schedule enable' to activate automatic summaries.[/dim]",
+                "[yellow]Conflict Detection Automation: DISABLED[/yellow]\n\n"
+                "[dim]Run 'memanto schedule enable' to activate automatic "
+                "conflict detection.[/dim]",
                 title="Schedule Status",
                 border_style=WARNING,
             )
