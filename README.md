@@ -28,6 +28,28 @@
     <a href="https://x.com/moorcheh_ai" target="_blank"><img src="https://img.shields.io/twitter/url/https/twitter.com/langchain.svg?style=social&label=Follow%20%40Moorcheh.ai" alt="Twitter / X"></a>
 </p>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Windows-supported-blue.svg" alt="Windows">
+  <img src="https://img.shields.io/badge/macOS-supported-blue.svg" alt="macOS">
+  <img src="https://img.shields.io/badge/Linux-supported-blue.svg" alt="Linux">
+</p>
+
+<p align="center">
+  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/Claude_Code-supported-blueviolet.svg" alt="Claude Code"></a>
+  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/Cursor-supported-blueviolet.svg" alt="Cursor"></a>
+  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/Codex-supported-blueviolet.svg" alt="Codex"></a>
+  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/OpenCode-supported-blueviolet.svg" alt="OpenCode"></a>
+  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/Windsurf-supported-blueviolet.svg" alt="Windsurf"></a>
+  <a href="https://docs.memanto.ai/integrations/hermes-agents"><img src="https://img.shields.io/badge/Hermes_Agent-supported-blueviolet.svg" alt="Hermes Agent"></a>
+  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/Gemini-supported-blueviolet.svg" alt="Gemini"></a>
+  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/Antigravity-supported-blueviolet.svg" alt="Antigravity"></a>
+  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/RooCode-supported-blueviolet.svg" alt="RooCode"></a>
+  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/Cline-supported-blueviolet.svg" alt="Cline"></a>
+  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/Continue-supported-blueviolet.svg" alt="Continue"></a>
+  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/Goose-supported-blueviolet.svg" alt="Goose"></a>
+  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/GitHubCopilot-supported-blueviolet.svg" alt="GitHub Copilot"></a>
+  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/AugmentCode-supported-blueviolet.svg" alt="AugmentCode"></a>
+</p>
 
 <a href="https://www.star-history.com/?repos=moorcheh-ai%2Fmemanto&type=date&legend=top-left">
  <picture>
