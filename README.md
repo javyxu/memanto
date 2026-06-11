@@ -36,22 +36,6 @@
     <a href="https://x.com/moorcheh_ai" target="_blank"><img src="https://img.shields.io/twitter/url/https/twitter.com/langchain.svg?style=social&label=Follow%20%40Moorcheh.ai" alt="Twitter / X"></a>
 </p>
 
-<p align="center">
-  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/Claude_Code-supported-blueviolet.svg" alt="Claude Code"></a>
-  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/Cursor-supported-blueviolet.svg" alt="Cursor"></a>
-  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/Codex-supported-blueviolet.svg" alt="Codex"></a>
-  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/OpenCode-supported-blueviolet.svg" alt="OpenCode"></a>
-  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/Windsurf-supported-blueviolet.svg" alt="Windsurf"></a>
-  <a href="https://docs.memanto.ai/integrations/hermes-agents"><img src="https://img.shields.io/badge/Hermes_Agent-supported-blueviolet.svg" alt="Hermes Agent"></a>
-  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/Gemini-supported-blueviolet.svg" alt="Gemini"></a>
-  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/Antigravity-supported-blueviolet.svg" alt="Antigravity"></a>
-  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/RooCode-supported-blueviolet.svg" alt="RooCode"></a>
-  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/Cline-supported-blueviolet.svg" alt="Cline"></a>
-  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/Continue-supported-blueviolet.svg" alt="Continue"></a>
-  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/Goose-supported-blueviolet.svg" alt="Goose"></a>
-  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/GitHubCopilot-supported-blueviolet.svg" alt="GitHub Copilot"></a>
-  <a href="https://docs.memanto.ai/integrations/overview"><img src="https://img.shields.io/badge/AugmentCode-supported-blueviolet.svg" alt="AugmentCode"></a>
-</p>
 
 <p align="center"><a href="https://trendshift.io/repositories/27378" target="_blank"><img src="https://trendshift.io/api/badge/repositories/27378" alt="moorcheh-ai%2Fmemanto | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a></p>
 
@@ -68,6 +52,11 @@
 
 
 ---
+## What Is MEMANTO?
+
+**MEMANTO is a memory agent. It remembers, recalls, and answers — so your agents can achieve long-term goals and avoid confusion.**
+
+Most memory tools today are passive infrastructure: agents have to query them, parse the results, and figure out what to do next. MEMANTO is built differently. It's an active memory agent designed from the gaps agents themselves named when asked about their memory — three operations (`remember`, `recall`, `answer`) that give your agents persistent context across sessions, with state-of-the-art retrieval and zero ingestion latency.
 
 ## Get started in 2 minutes
 
@@ -85,6 +74,7 @@ Requires Docker. Everything runs and stays on your machine.
 pip install memanto
 memanto           # choose "Cloud" — paste your free Moorcheh API key
 ```
+Get your free API from : https://console.moorcheh.ai/api-keys
 
 Switch between local and cloud at any time with `memanto config backend`.
 
@@ -146,11 +136,29 @@ Memanto's retrieval is powered by [Moorcheh](https://moorcheh.ai), an informatio
   <img alt="MEMANTO architecture" src="https://github.com/moorcheh-ai/memanto/raw/main/assets/Architecture-diagram.png" width="1000">
 </p>
 
+### On-Prem
+
+<p align="center">
+  <img alt="MEMANTO architecture" src="https://github.com/moorcheh-ai/memanto/raw/main/assets/On-prem-architecture-diagram.png" width="1000">
+</p>
+
+---
+
+## Why Moorcheh?
+
+Moorcheh is the semantic engine behind Memanto's retrieval. Unlike vector databases that rely on approximate search and require indexing pipelines, Moorcheh uses an information-theoretic approach that returns exact results with zero indexing delay, write a memory and it's searchable immediately.
+
+This means Memanto doesn't need a separate vector DB, embedding pipeline, or reranking stage. The Moorcheh engine runs as a local Docker container for on-prem users (no account needed) or as a managed cloud service with a free tier. Either way, it's invisible - the `memanto` CLI handles it.
+
 ---
 
 ## Setup & Demo
 
-[![Watch the video](https://img.youtube.com/vi/vEtOaoweIG4/0.jpg)](https://www.youtube.com/watch?v=vEtOaoweIG4)
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=vEtOaoweIG4">
+    <img src="https://img.youtube.com/vi/vEtOaoweIG4/0.jpg" alt="Watch the video">
+  </a>
+</p>
 
 ---
 

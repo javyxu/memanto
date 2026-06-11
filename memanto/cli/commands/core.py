@@ -139,6 +139,23 @@ def _cloud_setup() -> None:
     console.print()
 
 
+def _prompt_onprem_setup_mode() -> bool:
+    """Ask user for setup mode. Returns True for Quick Setup, False for Choose Models."""
+    console.print()
+    console.print(f"[{BOLD_BRIGHT}]On-Prem Setup Mode[/{BOLD_BRIGHT}]")
+    console.print(
+        f"  [{BRIGHT}]1[/{BRIGHT}]  Quick Setup  "
+        f"[dim]- Ollama with nomic-embed-text (embedding) + qwen2.5 (LLM), zero config[/dim]"
+    )
+    console.print(
+        f"  [{BRIGHT}]2[/{BRIGHT}]  Choose Models  "
+        f"[dim]- pick your own embedding and LLM providers[/dim]"
+    )
+    choice = typer.prompt("  Enter 1 or 2", default="1")
+    console.print()
+    return str(choice).strip() == "1"
+
+
 def _onprem_setup() -> None:
     """On-prem branch: install moorcheh-client if missing, configure, start."""
     console.print(
@@ -153,29 +170,43 @@ def _onprem_setup() -> None:
     _ensure_docker_available()
     _ensure_moorcheh_client_installed()
 
-    # Embedding model is a one-time choice (set on first on-prem onboarding).
-    # On subsequent runs — e.g., switching cloud→on-prem after having previously
-    # onboarded on-prem — reuse what state.json already has and recover the
-    # api_key from ~/.moorcheh/config.json. Skipping this would force the user
-    # to re-pick the same provider/model on every backend swap.
     existing_state = config_manager.get_onprem_state()
-    if existing_state.get("embedding_provider") and existing_state.get(
-        "embedding_model"
+    if (
+        existing_state.get("embedding_provider")
+        and existing_state.get("embedding_model")
+        and existing_state.get("llm_provider")
+        and existing_state.get("llm_model")
     ):
         embedding_provider = existing_state["embedding_provider"]
         embedding_model = existing_state["embedding_model"]
         embedding_key = _recover_moorcheh_api_key("embedding", embedding_provider)
+        llm_provider = existing_state["llm_provider"]
+        llm_model = existing_state["llm_model"]
+        llm_key = _recover_moorcheh_api_key("llm", llm_provider)
         console.print(
-            f"[dim]  Reusing embedding from previous on-prem setup: "
-            f"{embedding_provider} / {embedding_model}[/dim]"
+            f"[dim]  Reusing previous on-prem setup: "
+            f"{embedding_provider} / {embedding_model} + {llm_provider} / {llm_model}[/dim]"
         )
     else:
-        embedding_provider, embedding_model, embedding_key = (
-            _prompt_embedding_provider()
-        )
-    llm_provider, llm_model, llm_key = _prompt_llm_provider(
-        embedding_provider, embedding_key
-    )
+        quick_setup = _prompt_onprem_setup_mode()
+        if quick_setup:
+            embedding_provider, embedding_model, embedding_key = (
+                "ollama",
+                "nomic-embed-text",
+                "",
+            )
+            llm_provider, llm_model, llm_key = "ollama", "qwen2.5", ""
+            console.print(
+                "[dim]  Quick Setup: Ollama with nomic-embed-text "
+                "(embedding) + qwen2.5 (LLM)[/dim]"
+            )
+        else:
+            embedding_provider, embedding_model, embedding_key = (
+                _prompt_embedding_provider()
+            )
+            llm_provider, llm_model, llm_key = _prompt_llm_provider(
+                embedding_provider, embedding_key
+            )
     # Write the FULL config (embedding + LLM) to ~/.moorcheh/config.json BEFORE
     # `moorcheh up`, so the server reads the complete config on first boot and
     # we don't have to bounce the stack. `moorcheh up` itself only knows
