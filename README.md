@@ -62,15 +62,11 @@ Most memory tools today are passive infrastructure: agents have to query them, p
   <h2>Memanto in action</h2>
   <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; margin: 20px 0;">
     <div style="text-align: center;">
-      <video autoplay loop muted playsinline width="400" style="border-radius: 8px; max-width: 100%;">
-        <source src="https://github.com/moorcheh-ai/memanto/raw/main/assets/Before.mp4" type="video/mp4">
-      </video>
+      <img src="https://github.com/moorcheh-ai/memanto/raw/main/assets/Before.gif" alt="Before" width="400" style="border-radius: 8px; max-width: 100%;">
       <p style="margin-top: 8px;"><strong>Without Memanto</strong></p>
     </div>
     <div style="text-align: center;">
-      <video autoplay loop muted playsinline width="400" style="border-radius: 8px; max-width: 100%;">
-        <source src="https://github.com/moorcheh-ai/memanto/raw/main/assets/After.mp4" type="video/mp4">
-      </video>
+      <img src="https://github.com/moorcheh-ai/memanto/raw/main/assets/After.gif" alt="After" width="400" style="border-radius: 8px; max-width: 100%;">
       <p style="margin-top: 8px;"><strong>With Memanto</strong></p>
     </div>
   </div>
