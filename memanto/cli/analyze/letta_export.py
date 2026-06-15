@@ -47,7 +47,9 @@ def _client(api_key: str) -> httpx.Client:
     )
 
 
-def _get_json(client: httpx.Client, path: str, params: dict[str, Any] | None = None) -> Any:
+def _get_json(
+    client: httpx.Client, path: str, params: dict[str, Any] | None = None
+) -> Any:
     resp = client.get(path, params=params or {})
     if resp.status_code >= 400:
         raise RuntimeError(f"GET {path} -> {resp.status_code}: {resp.text[:500]}")

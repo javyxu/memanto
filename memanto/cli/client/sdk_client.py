@@ -523,18 +523,35 @@ class SdkClient:
             )
             raw_type = item.get("type")
 
-            memory = MemoryRecord(
-                type=raw_type,
-                title=title,
-                content=raw_content,
-                scope_type="agent",
-                scope_id=agent_id,
-                actor_id=agent_id,
-                confidence=item.get("confidence", 0.8),
-                tags=item.get("tags", []),
-                source="user",
-                provenance="explicit_statement",
-            )
+            # Optional per-item overrides — used by `memanto migrate` to keep
+            # source provenance, original ids, and source-side timestamps when
+            # importing from Mem0/Letta/Supermemory. Defaults preserve the
+            # original single-user-write behavior.
+            provenance = item.get("provenance") or "explicit_statement"
+            if provenance not in _VALID_PROVENANCE:
+                raise ValueError(
+                    f"Invalid provenance '{provenance}' at index {i}. "
+                    f"Must be one of: {', '.join(sorted(_VALID_PROVENANCE))}"
+                )
+
+            kwargs: dict[str, Any] = {
+                "type": raw_type,
+                "title": title,
+                "content": raw_content,
+                "scope_type": "agent",
+                "scope_id": agent_id,
+                "actor_id": agent_id,
+                "confidence": item.get("confidence", 0.8),
+                "tags": item.get("tags", []),
+                "source": item.get("source") or "user",
+                "provenance": provenance,
+            }
+            for opt_key in ("source_ref", "created_at", "updated_at"):
+                val = item.get(opt_key)
+                if val is not None:
+                    kwargs[opt_key] = val
+
+            memory = MemoryRecord(**kwargs)
             memory_records.append(memory)
 
         logger.debug(

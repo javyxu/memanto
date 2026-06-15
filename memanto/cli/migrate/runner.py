@@ -23,7 +23,7 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from memanto.cli.migrate.mappers import MAPPERS, type_breakdown
 
@@ -60,15 +60,13 @@ def load_export(file_path: Path) -> dict[str, Any]:
     """Load a previously-produced provider export JSON from disk."""
     if not file_path.exists():
         raise FileNotFoundError(f"Export file not found: {file_path}")
-    return json.loads(file_path.read_text(encoding="utf-8"))
+    return cast(dict[str, Any], json.loads(file_path.read_text(encoding="utf-8")))
 
 
 def map_export(provider: str, export: dict[str, Any]) -> list[dict[str, Any]]:
     mapper = MAPPERS.get(provider)
     if mapper is None:
-        raise ValueError(
-            f"Unknown provider '{provider}'. Supported: {sorted(MAPPERS)}"
-        )
+        raise ValueError(f"Unknown provider '{provider}'. Supported: {sorted(MAPPERS)}")
     return mapper(export)
 
 

@@ -20,9 +20,10 @@ migrate and old analyze artifacts cleanly separated.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, cast
 
 import typer
 from rich.panel import Panel
@@ -284,9 +285,8 @@ def _load_or_export(
 
     key = _resolve_provider_key(provider, api_key)
     try:
-        if provider == "letta":
-            return bundle["exporter"](key, run_dir, on_progress=progress)
-        return bundle["exporter"](key, run_dir, on_progress=progress)
+        result = bundle["exporter"](key, run_dir, on_progress=progress)
+        return cast(tuple[Path, dict[str, Any]], result)
     except ImportError as exc:
         _error(str(exc))
     except ValueError as exc:
@@ -361,9 +361,9 @@ def _run_migrate_flow(
         )
 
     # Step 5 — summarize.
-    type_lines = ", ".join(
-        f"{k}: {v}" for k, v in sorted(summary.type_counts.items())
-    ) or "—"
+    type_lines = (
+        ", ".join(f"{k}: {v}" for k, v in sorted(summary.type_counts.items())) or "—"
+    )
 
     body_lines = [
         f"[dim]Source records:[/dim] {summary.source_count}",
@@ -390,8 +390,7 @@ def _run_migrate_flow(
     if summary.errors:
         sample = summary.errors[0]
         body_lines.append(
-            f"[red]First error:[/red] {sample}  "
-            f"[dim](see run dir for more)[/dim]"
+            f"[red]First error:[/red] {sample}  [dim](see run dir for more)[/dim]"
         )
 
     border = WARNING if summary.failed else SUCCESS
@@ -417,23 +416,31 @@ def _run_migrate_flow(
 @migrate_app.command("mem0")
 def migrate_mem0(
     api_key: str | None = typer.Option(
-        None, "--api-key", envvar="MEM0_API_KEY",
+        None,
+        "--api-key",
+        envvar="MEM0_API_KEY",
         help="Mem0 API key (saved to ~/.memanto/.env)",
     ),
     file: Path | None = typer.Option(
-        None, "--file", "-f",
+        None,
+        "--file",
+        "-f",
         help="Existing Mem0 export JSON (skip live export).",
     ),
     agent: str | None = typer.Option(
-        None, "--agent", "-a",
+        None,
+        "--agent",
+        "-a",
         help="Target Memanto agent id (defaults to the active agent).",
     ),
     dry_run: bool = typer.Option(
-        False, "--dry-run",
+        False,
+        "--dry-run",
         help="Preview the mapping and savings report without writing.",
     ),
     report: bool = typer.Option(
-        False, "--report",
+        False,
+        "--report",
         help="Also write the token/latency/storage savings report on a real run.",
     ),
 ):
@@ -457,23 +464,31 @@ def migrate_mem0(
 @migrate_app.command("letta")
 def migrate_letta(
     api_key: str | None = typer.Option(
-        None, "--api-key", envvar="LETTA_API_KEY",
+        None,
+        "--api-key",
+        envvar="LETTA_API_KEY",
         help="Letta API key (saved to ~/.memanto/.env)",
     ),
     file: Path | None = typer.Option(
-        None, "--file", "-f",
+        None,
+        "--file",
+        "-f",
         help="Existing Letta export JSON (skip live export).",
     ),
     agent: str | None = typer.Option(
-        None, "--agent", "-a",
+        None,
+        "--agent",
+        "-a",
         help="Target Memanto agent id (defaults to the active agent).",
     ),
     dry_run: bool = typer.Option(
-        False, "--dry-run",
+        False,
+        "--dry-run",
         help="Preview the mapping and savings report without writing.",
     ),
     report: bool = typer.Option(
-        False, "--report",
+        False,
+        "--report",
         help="Also write the token/latency/storage savings report on a real run.",
     ),
 ):
@@ -491,23 +506,31 @@ def migrate_letta(
 @migrate_app.command("supermemory")
 def migrate_supermemory(
     api_key: str | None = typer.Option(
-        None, "--api-key", envvar="SUPERMEMORY_API_KEY",
+        None,
+        "--api-key",
+        envvar="SUPERMEMORY_API_KEY",
         help="Supermemory API key (saved to ~/.memanto/.env)",
     ),
     file: Path | None = typer.Option(
-        None, "--file", "-f",
+        None,
+        "--file",
+        "-f",
         help="Existing Supermemory export JSON (skip live export).",
     ),
     agent: str | None = typer.Option(
-        None, "--agent", "-a",
+        None,
+        "--agent",
+        "-a",
         help="Target Memanto agent id (defaults to the active agent).",
     ),
     dry_run: bool = typer.Option(
-        False, "--dry-run",
+        False,
+        "--dry-run",
         help="Preview the mapping and savings report without writing.",
     ),
     report: bool = typer.Option(
-        False, "--report",
+        False,
+        "--report",
         help="Also write the token/latency/storage savings report on a real run.",
     ),
 ):
