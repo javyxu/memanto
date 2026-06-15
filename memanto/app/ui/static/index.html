@@ -2275,6 +2275,54 @@
             setTimeout(() => el.remove(), 4000);
         }
 
+        // Confirm dialog — themed replacement for browser ``confirm()``. Returns
+        // a Promise<boolean>. Callers should ``await confirmDialog({...})``.
+        // ``danger: true`` styles the primary action with ``btn-danger``.
+        function confirmDialog({ title = 'Confirm', message = '', confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false } = {}) {
+            return new Promise(resolve => {
+                const backdrop = document.createElement('div');
+                backdrop.className = 'modal-backdrop';
+                const primaryCls = danger ? 'btn btn-danger' : 'btn btn-primary';
+                backdrop.innerHTML = `<div class="modal" style="width:min(440px,90vw)">
+                    <div class="modal-header">
+                        <h3>${escHtml(title)}</h3>
+                        <button class="modal-close" data-act="cancel">×</button>
+                    </div>
+                    <p style="color:var(--text-secondary);line-height:1.6;margin-bottom:20px">${escHtml(message)}</p>
+                    <div style="display:flex;justify-content:flex-end;gap:8px">
+                        <button class="btn btn-secondary" data-act="cancel">${escHtml(cancelLabel)}</button>
+                        <button class="${primaryCls}" data-act="confirm">${escHtml(confirmLabel)}</button>
+                    </div>
+                </div>`;
+                const close = (result) => {
+                    document.removeEventListener('keydown', onKey);
+                    backdrop.remove();
+                    resolve(result);
+                };
+                const onKey = (e) => {
+                    if (e.key === 'Escape') close(false);
+                    else if (e.key === 'Enter') close(true);
+                };
+                backdrop.addEventListener('click', (e) => {
+                    // Click on the backdrop itself (outside the .modal) cancels.
+                    if (e.target === backdrop) { close(false); return; }
+                    // Button delegation: walk up to nearest [data-act] in case
+                    // the click landed on inner text/icon rather than the
+                    // <button> element.
+                    const actEl = e.target.closest && e.target.closest('[data-act]');
+                    if (!actEl) return;
+                    const act = actEl.getAttribute('data-act');
+                    if (act === 'cancel') close(false);
+                    else if (act === 'confirm') close(true);
+                });
+                document.addEventListener('keydown', onKey);
+                document.body.appendChild(backdrop);
+                // Focus the primary action so Enter just works
+                const btn = backdrop.querySelector('[data-act="confirm"]');
+                if (btn) btn.focus();
+            });
+        }
+
         // Confidence class
         function confClass(c) { const v = parseFloat(c) || 0; return v >= 0.8 ? 'conf-high' : v >= 0.5 ? 'conf-med' : 'conf-low'; }
         function confBadge(c) { const v = parseFloat(c) || 0; return `<span class="${confClass(c)}" style="font-weight:600">${v.toFixed(2)}</span>`; }
@@ -2730,7 +2778,7 @@
                 const res = await api('POST', `/api/v2/agents/${S.agentId}/recall`, body);
                 const mems = res.memories || [];
                 if (!mems.length) { box.innerHTML = '<p style="color:var(--text-dim);padding:20px">No memories found</p>'; return; }
-                box.innerHTML = buildMemoryTable(mems);
+                box.innerHTML = buildMemoryTable(mems, true);
             } catch (e) { box.innerHTML = `<p style="color:var(--error);padding:20px">Error: ${e.message}</p>`; }
         }
 
@@ -2878,13 +2926,52 @@
             <td style="font-size:11px">${escHtml(trunc(tags, 40))}</td>
         </tr>`;
                 if (expandable) {
-                    html += `<tr class="expand-row" id="exp-${i}"><td colspan="8"><div class="expand-content">${escHtml(m.content || m.text || 'No content')}\n\nID: ${m.id || '—'}\nScore: ${m.score ?? '—'}\nSource: ${m.source || '—'}\nUpdated: ${fmtDate(m.updated_at)}</div></td></tr>`;
+                    const memId = m.id ? String(m.id) : '';
+                    const forgetBtn = memId
+                        ? `<button class="btn btn-danger btn-sm" onclick="forgetMemory('${escHtml(memId)}', this, event)">Forget</button>`
+                        : '<span style="font-size:11px;color:var(--text-dim)">No ID — cannot forget</span>';
+                    html += `<tr class="expand-row" id="exp-${i}"><td colspan="8"><div class="expand-content">${escHtml(m.content || m.text || 'No content')}\n\nID: ${memId || '—'}\nScore: ${m.score ?? '—'}\nSource: ${m.source || '—'}\nUpdated: ${fmtDate(m.updated_at)}</div><div style="padding:8px 16px;display:flex;justify-content:flex-end">${forgetBtn}</div></td></tr>`;
                 }
             });
             html += '</tbody></table>';
             return html;
         }
         function toggleRow(id) { const r = document.getElementById(id); if (r) r.classList.toggle('open'); }
+
+        // Delete a single memory from the active agent. Mirrors the CLI
+        // ``memanto forget`` command and the ``DELETE /api/v2/agents/{id}/
+        // memories/{mid}`` REST route. Removes both rows (data + expand) from
+        // the DOM on success; also drops the entry from ``S.memories`` /
+        // ``S.history`` so explorer/history views stay consistent without a
+        // full refetch.
+        async function forgetMemory(memoryId, btn, ev) {
+            if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+            if (!S.agentId || !S.token) { toast('No active agent/session', 'error'); return; }
+            if (!memoryId) { toast('Memory ID missing', 'error'); return; }
+            const ok = await confirmDialog({
+                title: 'Forget memory?',
+                message: `Memory '${memoryId}' will be permanently deleted from agent '${S.agentId}'. This cannot be undone.`,
+                confirmLabel: 'Forget',
+                cancelLabel: 'Cancel',
+                danger: true,
+            });
+            if (!ok) return;
+            const orig = btn ? btn.innerHTML : null;
+            if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Forgetting...'; }
+            try {
+                await api('DELETE', `/api/v2/agents/${S.agentId}/memories/${encodeURIComponent(memoryId)}`);
+                toast(`Forgot memory ${memoryId}`);
+                const expandRow = btn ? btn.closest('tr.expand-row') : null;
+                const dataRow = expandRow ? expandRow.previousElementSibling : null;
+                if (dataRow) dataRow.remove();
+                if (expandRow) expandRow.remove();
+                if (Array.isArray(S.memories)) S.memories = S.memories.filter(m => String(m.id) !== String(memoryId));
+                if (Array.isArray(S.history)) S.history = S.history.filter(m => String(m.id) !== String(memoryId));
+            } catch (e) {
+                toast('Failed to forget memory: ' + e.message, 'error');
+                if (btn) { btn.disabled = false; btn.innerHTML = orig || 'Forget'; }
+            }
+        }
 
         // ================================================================
         // HISTORY (GitHub-style contribution graph + timeline)

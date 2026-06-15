@@ -202,7 +202,9 @@ class MemoryReadService:
 
             # Perform cross-namespace search. Same kiosk_mode caveat as
             # search_memories: min_similarity=0.0 means "no filter".
-            use_kiosk = min_similarity_score is not None and 0 < min_similarity_score <= 1
+            use_kiosk = (
+                min_similarity_score is not None and 0 < min_similarity_score <= 1
+            )
             search_result = self.client.similarity_search.query(
                 query=enhanced_query,
                 namespaces=namespaces,
