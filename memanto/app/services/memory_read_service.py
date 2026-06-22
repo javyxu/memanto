@@ -830,6 +830,7 @@ class MemoryReadService:
             "ttl_seconds": get_field("ttl_seconds"),
             "actor_id": get_field("actor_id"),
             "source": get_field("source"),
+            "source_ref": get_field("source_ref"),
             "scope_type": get_field("scope_type"),
             "scope_id": get_field("scope_id"),
             "score": item.get("score"),  # Search relevance score

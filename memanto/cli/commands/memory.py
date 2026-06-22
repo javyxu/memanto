@@ -546,6 +546,10 @@ def recall(
             created = memory.get("created_at") or ""
             status = memory.get("status") or "active"
             change_type = memory.get("change_type")
+            source = memory.get("source") or ""
+            source_ref = memory.get("source_ref") or ""
+            provenance = memory.get("provenance") or ""
+            mem_tags = memory.get("tags") or []
 
             # Determine memory source from ID pattern
             id_str = memory.get("id", "unknown")
@@ -568,10 +572,24 @@ def recall(
             if created:
                 panel_content += f"\n[dim]Created: {format_local_time(created)}[/dim]"
             elif "_summary_" in id_str or "_chunk_" in id_str:
-                file_source = memory.get("source") or ""
-                if file_source:
-                    panel_content += f"\n[dim]Source file: {file_source}[/dim]"
                 panel_content += "\n[dim]Created: not available (file upload)[/dim]"
+
+            # Show provenance metadata. `source` is unified: it holds the
+            # uploaded file name for file-upload memories and the origin
+            # (user, agent, ...) for everything else.
+            origin_parts = []
+            if source:
+                origin_parts.append(f"Source: {source}")
+            if source_ref:
+                origin_parts.append(f"Ref: {source_ref}")
+            if provenance:
+                origin_parts.append(f"Provenance: {provenance}")
+            if origin_parts:
+                panel_content += f"\n[dim]{' | '.join(origin_parts)}[/dim]"
+
+            # Show tags when present
+            if mem_tags:
+                panel_content += f"\n[dim]Tags: {', '.join(mem_tags)}[/dim]"
 
             # Show status for non-standard queries
             if temporal_mode != "standard" and status != "active":
