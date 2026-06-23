@@ -65,20 +65,29 @@ export class ServerLifecycle {
       stdio: this.opts.verbose ? "inherit" : "ignore",
     });
 
-    child.on("error", (err: NodeJS.ErrnoException) => {
-      if (err.code === "ENOENT") {
-        throw new Error(
-          "Could not find `uvx`. Install uv from https://docs.astral.sh/uv/ and ensure it is on PATH.",
-        );
-      }
-      throw err;
-    });
-
     this.process = child;
     this.registerCleanup();
 
     const baseUrl = `http://${host}:${port}`;
-    await this.waitForHealth(baseUrl, this.opts.healthTimeoutMs ?? 60_000);
+
+    const spawnError = new Promise<never>((_, reject) => {
+      child.on("error", (err: NodeJS.ErrnoException) => {
+        if (err.code === "ENOENT") {
+          reject(
+            new Error(
+              "Could not find `uvx`. Install uv from https://docs.astral.sh/uv/ and ensure it is on PATH.",
+            ),
+          );
+        } else {
+          reject(err);
+        }
+      });
+    });
+
+    await Promise.race([
+      this.waitForHealth(baseUrl, this.opts.healthTimeoutMs ?? 60_000),
+      spawnError,
+    ]);
     this.url = baseUrl;
     return baseUrl;
   }
@@ -89,11 +98,12 @@ export class ServerLifecycle {
     this.url = null;
     if (!child || child.killed) return;
 
-    await new Promise<void>((resolve) => {
-      child.once("exit", () => resolve());
+    let exited = false;
+    await new Promise<void>((resolve, reject) => {
+      child.once("exit", () => { exited = true; resolve(); });
       child.kill("SIGTERM");
       setTimeout(() => {
-        if (!child.killed) child.kill("SIGKILL");
+        if (!exited) child.kill("SIGKILL");
       }, 5_000);
     });
   }

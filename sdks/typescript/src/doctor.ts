@@ -36,8 +36,15 @@ function run(cmd: string, args: string[]): Promise<string> {
     let stderr = "";
     child.stdout.on("data", (b) => (stdout += b.toString()));
     child.stderr.on("data", (b) => (stderr += b.toString()));
-    child.on("error", reject);
-    child.on("exit", (code) => {
+    let settled = false;
+    child.on("error", (err) => {
+      if (settled) return;
+      settled = true;
+      reject(err);
+    });
+    child.on("close", (code) => {
+      if (settled) return;
+      settled = true;
       if (code === 0) resolve(stdout || stderr);
       else reject(new Error(stderr || `exit ${code}`));
     });

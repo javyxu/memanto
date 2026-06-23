@@ -360,6 +360,7 @@ export class Memanto {
 
   async close(): Promise<void> {
     this.sessionToken = null;
+    this.starting = null;
     await this.lifecycle.stop();
   }
 
@@ -370,7 +371,12 @@ export class Memanto {
   private async ensureReady(): Promise<void> {
     if (this.sessionToken) return;
     if (!this.starting) this.starting = this.bootstrap();
-    await this.starting;
+    try {
+      await this.starting;
+    } catch (e) {
+      this.starting = null;
+      throw e;
+    }
   }
 
   private async bootstrap(): Promise<void> {
@@ -454,14 +460,15 @@ export class Memanto {
 async function asError(res: Response, prefix: string): Promise<Error> {
   let detail = "";
   try {
-    const body = (await res.json()) as { detail?: unknown; message?: unknown };
-    detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body);
-  } catch {
+    const text = await res.text();
     try {
-      detail = await res.text();
+      const body = JSON.parse(text) as { detail?: unknown; message?: unknown };
+      detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body);
     } catch {
-      detail = "";
+      detail = text;
     }
+  } catch {
+    detail = "";
   }
   return new Error(`${prefix} (${res.status}): ${detail}`);
 }
