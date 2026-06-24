@@ -1179,6 +1179,8 @@ class TestCWE200ApiKeyLeak:
     Verify that the raw API key is never returned (it is completely removed).
     """
 
+    TEST_AGENT_ID = "test-cwe200-agent"
+
     @pytest.mark.asyncio
     async def test_config_endpoint_does_not_return_api_key(
         self, client, _mock_ui_config_manager
