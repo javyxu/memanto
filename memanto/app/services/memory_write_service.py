@@ -360,10 +360,9 @@ class MemoryWriteService:
         raw = result.get("actual_deletions")
         if isinstance(raw, int):
             return raw > 0
-        for key in ("deleted_ids", "requested_ids"):
-            ids = result.get(key)
-            if isinstance(ids, list):
-                return len(ids) > 0
+        ids = result.get("deleted_ids")
+        if isinstance(ids, list):
+            return len(ids) > 0
         return str(result.get("status", "")).lower() in {"success", "ok"}
 
     def _ensure_namespace(self, memory: MemoryRecord) -> str:

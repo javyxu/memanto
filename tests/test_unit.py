@@ -256,7 +256,7 @@ class TestMemoryWriteServiceDelete:
             ({"status": "success", "deleted_ids": ["m1"]}, True),
             ({"status": "success", "deleted_ids": []}, False),
             ({"status": "success"}, True),
-            ({"requested_ids": ["m1"]}, True),
+            ({"requested_ids": ["m1"]}, False),
             ({}, False),
         ],
     )
