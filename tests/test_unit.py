@@ -268,6 +268,45 @@ class TestMemoryWriteServiceDelete:
         assert MemoryWriteService(client).delete_memory("m1", "ns") is expected
 
 
+class TestMemoryWriteServiceUpdate:
+    def test_update_memory_preserves_string_expires_at(self):
+        """Updating a TTL-backed memory should not fail when the stored
+        ``expires_at`` field comes back as an ISO string from the backend."""
+        from memanto.app.services.memory_write_service import MemoryWriteService
+
+        client = MagicMock()
+        client.documents.get.return_value = {
+            "items": [
+                {
+                    "id": "mem-ttl",
+                    "text": "[FACT] Old title\n\nOld content",
+                    "memory_type": "fact",
+                    "scope_type": "agent",
+                    "scope_id": "alpha",
+                    "actor_id": "user",
+                    "source": "user",
+                    "confidence": 0.8,
+                    "status": "active",
+                    "created_at": "2026-01-01T00:00:00Z",
+                    "updated_at": "2026-01-01T00:00:00Z",
+                    "expires_at": "2099-01-02T00:00:00Z",
+                    "ttl_seconds": 3600,
+                }
+            ]
+        }
+        client.documents.delete.return_value = {"actual_deletions": 1}
+        client.documents.upload.return_value = {"status": "success"}
+
+        result = MemoryWriteService(client).update_memory(
+            "mem-ttl", "memanto_agent_alpha", {"content": "New content"}
+        )
+
+        assert result["status"] == "success"
+        uploaded_doc = client.documents.upload.call_args.kwargs["documents"][0]
+        assert uploaded_doc["expires_at"] == "2099-01-02T00:00:00+00:00"
+        assert uploaded_doc["ttl_seconds"] == 3600
+
+
 class TestForgetEndToEnd:
     """End-to-end ``forget`` flow through ``DirectClient``: create agent →
     activate → delete_memory. Asserts on-prem's response shape

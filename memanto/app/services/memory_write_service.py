@@ -303,8 +303,17 @@ class MemoryWriteService:
                 updated_memory.set_ttl(updates["ttl_seconds"])
             elif metadata.get("ttl_seconds"):
                 updated_memory.ttl_seconds = metadata["ttl_seconds"]
-                if metadata.get("expires_at"):
-                    updated_memory.expires_at = metadata["expires_at"]
+                raw_expires_at = metadata.get("expires_at")
+                if raw_expires_at:
+                    if isinstance(raw_expires_at, str):
+                        try:
+                            updated_memory.expires_at = datetime.fromisoformat(
+                                raw_expires_at.replace("Z", "+00:00")
+                            )
+                        except (ValueError, AttributeError):
+                            pass  # Keep the default if the stored timestamp is invalid
+                    else:
+                        updated_memory.expires_at = raw_expires_at
 
             # Step 3: Delete old version
             delete_result = self.client.documents.delete(
