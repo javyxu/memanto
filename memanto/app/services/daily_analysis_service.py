@@ -51,7 +51,10 @@ class DailyAnalysisService:
         Generate a daily natural language summary for an agent and date.
         """
         # Validate output_path before any I/O so traversal attempts fail fast.
-        resolved_output = validate_output_path(output_path)
+        resolved_output = validate_output_path(
+            output_path,
+            base_dir=self.summaries_dir.parent,
+        )
         # Find all relevant session MD files
         pattern = f"{agent_id}_{date}_*_summary.md"
         session_files = list(self.sessions_dir.glob(pattern))

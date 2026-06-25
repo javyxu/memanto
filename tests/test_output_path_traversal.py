@@ -34,6 +34,11 @@ class TestValidateOutputPath:
         assert result is not None
         assert str(result).startswith(str(base))
 
+    def test_relative_path_anchored_to_base(self, tmp_path):
+        base = self._base(tmp_path)
+        result = self.fn("summaries/agent1.md", base_dir=base)
+        assert result == (base / "summaries" / "agent1.md").resolve()
+
     def test_absolute_traversal_rejected(self, tmp_path):
         from fastapi import HTTPException
         with pytest.raises(HTTPException) as exc:

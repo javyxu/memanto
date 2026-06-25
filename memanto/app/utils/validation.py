@@ -184,11 +184,16 @@ def validate_output_path(output_path: str | None, base_dir: Path | None = None) 
 
     safe_base = (base_dir or Path.home() / ".memanto").resolve()
     try:
-        resolved = Path(output_path).resolve()
+        candidate = Path(output_path)
+        if not candidate.is_absolute():
+            candidate = safe_base / candidate
+        resolved = candidate.resolve()
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid output_path")
 
-    if not str(resolved).startswith(str(safe_base) + "/") and resolved != safe_base:
+    try:
+        resolved.relative_to(safe_base)
+    except ValueError:
         raise HTTPException(
             status_code=400,
             detail=(
