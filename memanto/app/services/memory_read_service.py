@@ -514,7 +514,7 @@ class MemoryReadService:
             try:
                 confidence = float(raw_confidence)
             except (TypeError, ValueError):
-                if min_confidence == 0.0:
+                if min_confidence <= 0:
                     filtered.append(result)
                 continue
             if confidence >= min_confidence:
