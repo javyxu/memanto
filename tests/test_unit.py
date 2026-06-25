@@ -125,13 +125,14 @@ class TestSessionService:
 
         monkeypatch.delenv("MEMANTO_SECRET_KEY", raising=False)
 
-        assert Settings().MEMANTO_SECRET_KEY == ""
+        assert Settings(_env_file=None).MEMANTO_SECRET_KEY == ""
 
     def test_missing_session_secret_generates_unique_fallback(
         self, temp_dir, monkeypatch
     ):
         """Missing MEMANTO_SECRET_KEY should not reuse a predictable JWT secret."""
         monkeypatch.delenv("MEMANTO_SECRET_KEY", raising=False)
+        monkeypatch.setattr(settings, "MEMANTO_SECRET_KEY", "")
 
         first = SessionService(sessions_dir=temp_dir / "sessions-1")
         second = SessionService(sessions_dir=temp_dir / "sessions-2")
