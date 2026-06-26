@@ -7,7 +7,7 @@ Replaces tenant_id with Moorcheh API key-based authentication.
 
 import asyncio
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
 from memanto.app.clients import moorcheh as moorcheh_clients
 from memanto.app.config import settings
@@ -34,9 +34,11 @@ router = APIRouter()
 # Commented to avoid triggering ruff linter
 from memanto.app.routes import memory  # noqa: E402
 from memanto.app.routes.auth_deps import (  # noqa: E402
+    clear_session_cookie,
     get_current_session,
     get_moorcheh_api_key,
     get_session_service,
+    set_session_cookie,
     verify_moorcheh_api_key,
 )
 
@@ -188,6 +190,7 @@ async def delete_agent(
 @router.post("/agents/{agent_id}/activate", response_model=Session)
 async def activate_agent(
     agent_id: str,
+    response: Response,
     moorcheh_api_key: str = Depends(verify_moorcheh_api_key),
 ):
     """
@@ -216,6 +219,7 @@ async def activate_agent(
             pattern=agent.pattern,
             duration_hours=duration_hours,
         )
+        set_session_cookie(response, session.session_token)
 
         # Update agent stats
         agent_service.update_agent_stats(
@@ -233,6 +237,7 @@ async def activate_agent(
 @router.post("/agents/{agent_id}/deactivate", response_model=SessionSummary)
 async def deactivate_agent(
     agent_id: str,
+    response: Response,
     session: Session = Depends(get_current_session),
     _server_api_key: str = Depends(verify_moorcheh_api_key),
 ):
@@ -251,6 +256,7 @@ async def deactivate_agent(
 
     try:
         summary = get_session_service().end_session(agent_id)
+        clear_session_cookie(response)
         return summary
     except SessionNotFoundError as e:
         raise map_error_to_http_exception(e)

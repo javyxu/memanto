@@ -1191,6 +1191,30 @@ class TestCWE200ApiKeyLeak:
         assert "api_key" not in data
 
     @pytest.mark.asyncio
+    async def test_config_endpoint_does_not_return_session_token(
+        self, client, _mock_ui_config_manager
+    ):
+        """The UI config response must not expose reusable session credentials."""
+        resp = await client.get("/api/ui/config")
+        assert resp.status_code == 200
+        data = resp.json()
+
+        assert "session_token" not in data
+
+    @pytest.mark.asyncio
+    async def test_config_endpoint_sets_httponly_session_cookie(
+        self, client, _mock_ui_config_manager
+    ):
+        """Existing active sessions are restored for the UI via an HttpOnly cookie."""
+        resp = await client.get("/api/ui/config")
+        assert resp.status_code == 200
+
+        cookie = resp.headers.get("set-cookie", "")
+        assert "memanto_session_token=tok_abc" in cookie
+        assert "HttpOnly" in cookie
+        assert "SameSite=strict" in cookie
+
+    @pytest.mark.asyncio
     async def test_config_endpoint_still_has_api_key_status_fields(
         self, client, _mock_ui_config_manager
     ):
@@ -1208,6 +1232,56 @@ class TestCWE200ApiKeyLeak:
         # Session status field should be present (replaces sensitive session_token)
         assert "has_active_session" in data
         assert data["has_active_session"] is True
+
+    @pytest.mark.asyncio
+    async def test_activate_sets_httponly_session_cookie(self, client, auth_headers):
+        """Activation should also store the session token in an HttpOnly cookie."""
+        await client.post(
+            "/api/v2/agents",
+            headers=auth_headers,
+            json={"agent_id": self.TEST_AGENT_ID},
+        )
+
+        resp = await client.post(
+            f"/api/v2/agents/{self.TEST_AGENT_ID}/activate", headers=auth_headers
+        )
+        assert resp.status_code == 200
+
+        token = resp.json()["session_token"]
+        cookie = resp.headers.get("set-cookie", "")
+        assert f"memanto_session_token={token}" in cookie
+        assert "HttpOnly" in cookie
+        assert "SameSite=strict" in cookie
+
+    @pytest.mark.asyncio
+    async def test_memory_routes_accept_session_cookie(
+        self, client, auth_headers, mock_moorcheh
+    ):
+        """Browser UI calls can authenticate with the HttpOnly session cookie."""
+        await client.post(
+            "/api/v2/agents",
+            headers=auth_headers,
+            json={"agent_id": self.TEST_AGENT_ID},
+        )
+        activate_resp = await client.post(
+            f"/api/v2/agents/{self.TEST_AGENT_ID}/activate", headers=auth_headers
+        )
+        assert activate_resp.status_code == 200
+        token = activate_resp.json()["session_token"]
+        client.cookies.set("memanto_session_token", token)
+
+        response = await client.post(
+            f"/api/v2/agents/{self.TEST_AGENT_ID}/remember",
+            headers=auth_headers,
+            json={
+                "content": "cookie authenticated memory",
+                "type": "fact",
+                "confidence": 0.9,
+            },
+        )
+
+        assert response.status_code == 200
+        assert response.json()["agent_id"] == self.TEST_AGENT_ID
 
     @pytest.mark.asyncio
     async def test_traversal_filename_is_sanitized(
