@@ -34,6 +34,13 @@ class MemoryWriteService:
             self._namespace_service = NamespaceService(self.client)
         return self._namespace_service
 
+    def _apply_timestamps(self, memory: MemoryRecord, now: datetime) -> None:
+        """Apply server timestamps while preserving imported source chronology."""
+        if memory.provenance == "imported":
+            return
+        memory.created_at = now
+        memory.updated_at = now
+
     def store_memory(
         self, memory: MemoryRecord, context: dict[str, Any] | None = None
     ) -> dict[str, Any]:
@@ -43,10 +50,8 @@ class MemoryWriteService:
             if not memory.id:
                 memory.id = generate_memory_id()
 
-            # Enforce server-side timestamps (never trust client)
             now = datetime.utcnow()
-            memory.created_at = now
-            memory.updated_at = now
+            self._apply_timestamps(memory, now)
 
             # Auto parse memory type
             memory = self._parser.parse_memory(memory)
@@ -124,9 +129,7 @@ class MemoryWriteService:
                     if not memory.id:
                         memory.id = generate_memory_id()
 
-                    # Enforce server-side timestamps (never trust client)
-                    memory.created_at = now
-                    memory.updated_at = now
+                    self._apply_timestamps(memory, now)
 
                     memory = self._parser.parse_memory(memory)
 

@@ -4,7 +4,7 @@ MEMANTO Core Unit Tests (No Server Required)
 Tests the session and agent services directly without HTTP layer.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import jwt
@@ -344,6 +344,60 @@ class TestForgetEndToEnd:
         result = client.delete_memory(agent_id="test-agent", memory_id="mem-xyz")
         assert result["status"] == "deleted"
         assert result["memory_id"] == "mem-xyz"
+
+
+class TestMemoryWriteServiceTimestamps:
+    """Imported memories should keep source chronology during migration."""
+
+    def test_batch_store_preserves_imported_created_at(self):
+        from memanto.app.core import MemoryRecord
+        from memanto.app.services.memory_write_service import MemoryWriteService
+
+        client = MagicMock()
+        client.documents.upload.return_value = {"status": "success"}
+        service = MemoryWriteService(client)
+        source_created = datetime(2020, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+
+        memory = MemoryRecord(
+            title="Imported fact",
+            content="Original imported memory",
+            scope_type="agent",
+            scope_id="test-agent",
+            actor_id="test-agent",
+            source="mem0",
+            provenance="imported",
+            created_at=source_created,
+        )
+
+        service.batch_store_memories([memory])
+
+        uploaded = client.documents.upload.call_args.kwargs["documents"][0]
+        assert uploaded["created_at"].startswith("2020-01-02T03:04:05")
+
+    def test_batch_store_overrides_non_imported_created_at(self):
+        from memanto.app.core import MemoryRecord
+        from memanto.app.services.memory_write_service import MemoryWriteService
+
+        client = MagicMock()
+        client.documents.upload.return_value = {"status": "success"}
+        service = MemoryWriteService(client)
+        source_created = datetime(2020, 1, 2, 3, 4, 5, tzinfo=timezone.utc)
+
+        memory = MemoryRecord(
+            title="User fact",
+            content="Fresh user memory",
+            scope_type="agent",
+            scope_id="test-agent",
+            actor_id="test-agent",
+            source="user",
+            provenance="explicit_statement",
+            created_at=source_created,
+        )
+
+        service.batch_store_memories([memory])
+
+        uploaded = client.documents.upload.call_args.kwargs["documents"][0]
+        assert not uploaded["created_at"].startswith("2020-01-02T03:04:05")
 
 
 class TestMEMANTOArchitecture:
