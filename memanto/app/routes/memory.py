@@ -551,7 +551,6 @@ async def upload_file(
 
         # Write upload to a temp file so moorcheh SDK can read it
         # Use original filename so the SDK records it as the source
-        file_bytes = await file.read()
         tmp_dir = tempfile.mkdtemp()
         tmp_path = os.path.join(tmp_dir, original_name)
         # Defense-in-depth: verify resolved path is within tmp_dir
@@ -562,9 +561,30 @@ async def upload_file(
                 status_code=400,
                 detail="Invalid filename",
             )
+        # Stream file to disk in 1 MB chunks instead of loading it all into
+        # memory at once. Without this, a 5 GB upload would allocate ~5 GB of
+        # RAM in a single Python bytes object, making the server trivially
+        # exhaustible under concurrent large-file uploads.
+        _MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024  # 5 GB as documented
+        _CHUNK_SIZE = 1024 * 1024  # 1 MB
         try:
+            total_bytes = 0
             with open(tmp_path, "wb") as tmp:
-                tmp.write(file_bytes)
+                while True:
+                    chunk = await file.read(_CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    total_bytes += len(chunk)
+                    if total_bytes > _MAX_UPLOAD_BYTES:
+                        raise HTTPException(
+                            status_code=413,
+                            detail={
+                                "error": "file_too_large",
+                                "message": "File exceeds the maximum upload size of 5 GB",
+                                "max_bytes": _MAX_UPLOAD_BYTES,
+                            },
+                        )
+                    tmp.write(chunk)
             result = await asyncio.to_thread(
                 client.documents.upload_file, namespace, tmp_path
             )
