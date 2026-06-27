@@ -817,17 +817,24 @@ async def answer(
 
 
 class DailySummaryRequest(BaseModel):
+    """Request body for on-demand daily summary generation."""
+
     date: str | None = Field(
         default=None,
         description="Date string YYYY-MM-DD. Defaults to today.",
     )
     output_path: str | None = Field(
         default=None,
-        description="Optional custom output path for the summary MD file.",
+        description=(
+            "Accepted for backwards compatibility but ignored; summaries use "
+            "the server-controlled output location."
+        ),
     )
 
 
 class ConflictDetectRequest(BaseModel):
+    """Request body for on-demand conflict report generation."""
+
     date: str | None = Field(
         default=None,
         description="Date string YYYY-MM-DD. Defaults to today.",
