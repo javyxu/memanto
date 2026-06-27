@@ -1472,5 +1472,5 @@ class SdkClient:
     @staticmethod
     def _validate_recall_limit(limit: int) -> None:
         """Validate recall result limits before backend calls."""
-        if not isinstance(limit, int) or not 1 <= limit <= 100:
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
             raise ValueError(f"Limit must be an integer between 1 and 100, got {limit}")

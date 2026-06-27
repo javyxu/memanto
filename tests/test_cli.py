@@ -501,7 +501,7 @@ class TestMEMANTOCLI:
             ("recall_changed_since", {"since": "2026-06-27T00:00:00Z"}),
         ],
     )
-    @pytest.mark.parametrize("bad_limit", [0, 101, 1.5, "10"])
+    @pytest.mark.parametrize("bad_limit", [0, 101, 1.5, "10", True])
     def test_temporal_recall_rejects_invalid_limit_before_backend(
         self, client_class_path, method_name, args, bad_limit
     ):

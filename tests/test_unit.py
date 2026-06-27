@@ -361,6 +361,9 @@ class TestRecallConfigValidation:
         with pytest.raises(ValueError, match="limit must be an integer"):
             manager.set_recall_config(limit=1.5)
 
+        with pytest.raises(ValueError, match="limit must be an integer"):
+            manager.set_recall_config(limit=True)
+
     def test_set_recall_config_accepts_valid_limit(self, tmp_path):
         from memanto.cli.config.manager import ConfigManager
 
