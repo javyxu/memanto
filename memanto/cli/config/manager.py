@@ -376,6 +376,8 @@ class ConfigManager:
         data = self.load_yaml()
         recall = data.setdefault("recall", {})
         if limit is not None:
+            if not isinstance(limit, int) or not 1 <= limit <= 100:
+                raise ValueError("limit must be an integer between 1 and 100")
             recall["limit"] = limit
         if min_similarity is not None:
             if (

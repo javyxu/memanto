@@ -1016,6 +1016,7 @@ class DirectClient:
         """
         if limit is None:
             limit = ConfigManager().get_recall_config()["limit"]
+        self._validate_recall_limit(limit)
 
         # Ensure there is a valid, non-expired session for this agent
         self._get_validated_session_for_agent(agent_id)
@@ -1055,6 +1056,7 @@ class DirectClient:
         """
         if limit is None:
             limit = ConfigManager().get_recall_config()["limit"]
+        self._validate_recall_limit(limit)
 
         # Ensure there is a valid, non-expired session for this agent
         self._get_validated_session_for_agent(agent_id)
@@ -1092,6 +1094,7 @@ class DirectClient:
         """
         if limit is None:
             limit = ConfigManager().get_recall_config()["limit"]
+        self._validate_recall_limit(limit)
 
         # Ensure there is a valid, non-expired session for this agent
         self._get_validated_session_for_agent(agent_id)
@@ -1622,5 +1625,10 @@ class DirectClient:
         """Validate search parameters."""
         if not query or not query.strip():
             raise ValueError("Search query must be a non-empty string")
-        if not 1 <= limit <= 100:
-            raise ValueError(f"Limit must be between 1 and 100, got {limit}")
+        DirectClient._validate_recall_limit(limit)
+
+    @staticmethod
+    def _validate_recall_limit(limit: int) -> None:
+        """Validate recall result limits before backend calls."""
+        if not isinstance(limit, int) or not 1 <= limit <= 100:
+            raise ValueError(f"Limit must be an integer between 1 and 100, got {limit}")
