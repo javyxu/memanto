@@ -286,10 +286,17 @@ class MemoryReadService:
                     except (ValueError, AttributeError):
                         pass
 
-            # Sort by updated_at descending (most recent first)
-            changed_memories.sort(
-                key=lambda m: m.get("updated_at", m.get("created_at", "")), reverse=True
-            )
+            # Sort by the timestamp that made the memory qualify.
+            def _changed_sort_key(m: dict[str, Any]) -> datetime:
+                raw = m.get("updated_at") or m.get("created_at")
+                if not raw:
+                    return datetime.min.replace(tzinfo=timezone.utc)
+                try:
+                    return parse_iso_timestamp(str(raw))
+                except Exception:
+                    return datetime.min.replace(tzinfo=timezone.utc)
+
+            changed_memories.sort(key=_changed_sort_key, reverse=True)
 
             # Apply limit
             if limit is not None:

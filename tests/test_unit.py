@@ -288,6 +288,51 @@ class TestMemoryWriteServiceDelete:
         assert MemoryWriteService(client).delete_memory("m1", "ns") is expected
 
 
+class TestMemoryReadServiceChangedSince:
+    """Regression coverage for temporal changed-since result ordering."""
+
+    def test_changed_since_sorts_created_memories_without_updated_at(self):
+        """New memories with ``updated_at=None`` should not crash sorting."""
+        from memanto.app.services.memory_read_service import MemoryReadService
+
+        client = MagicMock()
+        client.documents.fetch_text_data.return_value = {
+            "items": [
+                {
+                    "id": "created-only",
+                    "text": "[fact] Created only",
+                    "metadata": {
+                        "created_at": "2026-01-03T00:00:00Z",
+                        "updated_at": None,
+                        "memory_type": "fact",
+                    },
+                },
+                {
+                    "id": "updated",
+                    "text": "[fact] Updated",
+                    "metadata": {
+                        "created_at": "2025-12-30T00:00:00Z",
+                        "updated_at": "2026-01-04T00:00:00Z",
+                        "memory_type": "fact",
+                    },
+                },
+            ],
+            "pagination": {"has_more": False},
+        }
+
+        result = MemoryReadService(client).search_changed_since(
+            since_date="2026-01-01T00:00:00Z",
+            agent_id="agent-1",
+            limit=None,
+        )
+
+        assert [memory["id"] for memory in result["results"]] == [
+            "updated",
+            "created-only",
+        ]
+        assert result["results"][1]["change_type"] == "created"
+
+
 class TestForgetEndToEnd:
     """End-to-end ``forget`` flow through ``DirectClient``: create agent →
     activate → delete_memory. Asserts on-prem's response shape
