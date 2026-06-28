@@ -19,6 +19,7 @@ class MemoryReadService:
     """Read, search, and format memories from the configured Moorcheh backend."""
 
     def __init__(self, moorcheh_client: "MoorchehClient"):
+        """Initialize the reader with an active Moorcheh client."""
         self.client = moorcheh_client
         self._namespace_service = None
 
