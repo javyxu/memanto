@@ -170,7 +170,7 @@ This means Memanto doesn't need a separate vector DB, embedding pipeline, or rer
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=vEtOaoweIG4">
-    <img src="https://img.youtube.com/vi/vEtOaoweIG4/0.jpg" alt="Setup video">
+    <img src="https://github.com/moorcheh-ai/memanto/raw/main/assets/video-demo.png" alt="Setup video">
   </a>
 </p>
 
@@ -178,7 +178,7 @@ This means Memanto doesn't need a separate vector DB, embedding pipeline, or rer
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=5n976CmzohE">
-    <img src="https://img.youtube.com/vi/5n976CmzohE/0.jpg" alt="Local dashboard demo">
+    <img src="https://github.com/moorcheh-ai/memanto/raw/main/assets/video-uidashboard.png" alt="Local dashboard demo">
   </a>
 </p>
 
