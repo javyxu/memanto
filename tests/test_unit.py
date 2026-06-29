@@ -268,6 +268,58 @@ class TestMemoryWriteServiceDelete:
         assert MemoryWriteService(client).delete_memory("m1", "ns") is expected
 
 
+class TestMemoryReadServiceVersionSelection:
+    """Duplicate document ids can appear while a delete-and-recreate update is
+    settling. The read path must keep the newest version so temporal queries do
+    not miss recently updated memories."""
+
+    def test_changed_since_uses_newest_duplicate_memory_version(self):
+        from memanto.app.services.memory_read_service import MemoryReadService
+
+        client = MagicMock()
+        client.documents.fetch_text_data.return_value = {
+            "items": [
+                {
+                    "id": "memory-1",
+                    "text": "[FACT] Old title\n\nstale content",
+                    "memory_type": "fact",
+                    "scope_type": "agent",
+                    "scope_id": "agent-1",
+                    "actor_id": "agent-1",
+                    "source": "agent",
+                    "status": "active",
+                    "confidence": 0.8,
+                    "created_at": "2026-06-01T00:00:00+00:00",
+                    "updated_at": "2026-06-01T00:00:00+00:00",
+                },
+                {
+                    "id": "memory-1",
+                    "text": "[FACT] New title\n\nfresh content",
+                    "memory_type": "fact",
+                    "scope_type": "agent",
+                    "scope_id": "agent-1",
+                    "actor_id": "agent-1",
+                    "source": "agent",
+                    "status": "active",
+                    "confidence": 0.9,
+                    "created_at": "2026-06-01T00:00:00+00:00",
+                    "updated_at": "2026-06-15T12:00:00+00:00",
+                },
+            ],
+            "pagination": {"has_more": False},
+        }
+
+        result = MemoryReadService(client).search_changed_since(
+            since_date="2026-06-10T00:00:00+00:00",
+            agent_id="agent-1",
+        )
+
+        assert result["total_found"] == 1
+        assert result["results"][0]["title"] == "New title"
+        assert result["results"][0]["content"] == "fresh content"
+        assert result["results"][0]["change_type"] == "updated"
+
+
 class TestForgetEndToEnd:
     """End-to-end ``forget`` flow through ``DirectClient``: create agent →
     activate → delete_memory. Asserts on-prem's response shape

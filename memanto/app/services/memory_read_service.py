@@ -471,18 +471,23 @@ class MemoryReadService:
                 if not next_token:
                     break
 
-        seen_ids: set[str] = set()
-        memories: list[dict[str, Any]] = []
-        for item in items:
+        latest_by_id: dict[str, tuple[tuple[datetime, int], dict[str, Any]]] = {}
+        for index, item in enumerate(items):
             # Skip summary chunks — only return real memory documents
             if isinstance(item, dict) and item.get("is_summary"):
                 continue
             formatted = self._format_memory_item(item)
             mid = formatted.get("id")
-            if not mid or mid in seen_ids:
+            if not mid:
                 continue
-            seen_ids.add(cast(str, mid))
 
+            version_key = self._memory_version_key(formatted, index)
+            existing = latest_by_id.get(cast(str, mid))
+            if existing is None or version_key >= existing[0]:
+                latest_by_id[cast(str, mid)] = (version_key, formatted)
+
+        memories: list[dict[str, Any]] = []
+        for _, formatted in latest_by_id.values():
             if type and formatted.get("type") not in type:
                 continue
             if tags:
@@ -493,6 +498,28 @@ class MemoryReadService:
             memories.append(formatted)
 
         return self._filter_expired_memories(memories)
+
+    def _memory_version_key(
+        self, memory: dict[str, Any], fetch_index: int
+    ) -> tuple[datetime, int]:
+        """Order duplicate memory ids by their newest known timestamp.
+
+        Delete-and-recreate updates can briefly expose the old and new document
+        with the same id. Prefer the newest updated_at/created_at value; when
+        timestamps are missing or equal, keep the later fetched item.
+        """
+        from memanto.app.utils.temporal_helpers import parse_iso_timestamp
+
+        fallback = datetime.min.replace(tzinfo=timezone.utc)
+        for field in ("updated_at", "created_at"):
+            raw = memory.get(field)
+            if not raw:
+                continue
+            try:
+                return parse_iso_timestamp(str(raw)), fetch_index
+            except (TypeError, ValueError):
+                continue
+        return fallback, fetch_index
 
     def _build_filtered_query(
         self,
