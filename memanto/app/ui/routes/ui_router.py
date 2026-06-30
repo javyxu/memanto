@@ -292,7 +292,23 @@ async def restart_onprem_backend():
     import httpx as _httpx
 
     async with _get_restart_lock():
-        return await _do_restart_onprem_backend(_asyncio, subprocess, _httpx)
+        # Schedule the restart as an independent task so that if this handler
+        # is cancelled (e.g. request timeout), the lock is not released while
+        # moorcheh down/up is still running in the worker thread.
+        # asyncio.shield() lets the inner task survive the handler's cancellation;
+        # the except block then waits for the subprocess to finish before the
+        # lock context-manager releases, keeping the serialisation guarantee.
+        inner = _asyncio.ensure_future(
+            _do_restart_onprem_backend(_asyncio, subprocess, _httpx)
+        )
+        try:
+            return await _asyncio.shield(inner)
+        except _asyncio.CancelledError:
+            try:
+                await inner
+            except Exception:
+                pass
+            raise
 
 
 async def _do_restart_onprem_backend(_asyncio, subprocess, _httpx):
