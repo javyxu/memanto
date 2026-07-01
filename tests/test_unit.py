@@ -450,5 +450,66 @@ def test_conflict_report_handles_non_object_json_items(tmp_path, monkeypatch):
     assert conflicts[0]["description"] == '["not an object", 1]'
 
 
+def test_daily_summary_omits_unset_active_ai_model(tmp_path, monkeypatch):
+    """On-prem summary generation should omit ai_model when no active model is set."""
+    from unittest.mock import MagicMock
+
+    from memanto.app.services import daily_analysis_service as module
+
+    sessions_dir = tmp_path / "sessions"
+    summaries_dir = tmp_path / "summaries"
+    sessions_dir.mkdir()
+    (sessions_dir / "agent-1_2026-06-28_001_summary.md").write_text(
+        "# Session\n\nRemembered a project milestone.",
+        encoding="utf-8",
+    )
+
+    client = MagicMock()
+    client.answer.generate.return_value = {"answer": "# Daily Summary"}
+    monkeypatch.setattr(module, "get_moorcheh_client", lambda: client)
+    monkeypatch.setattr(module, "get_active_llm_model", lambda _: None)
+
+    service = module.DailyAnalysisService(
+        sessions_dir=sessions_dir,
+        summaries_dir=summaries_dir,
+    )
+    result = service.generate_summary("agent-1", "2026-06-28")
+
+    assert result["status"] == "success"
+    call_kwargs = client.answer.generate.call_args.kwargs
+    assert "ai_model" not in call_kwargs
+
+
+def test_conflict_report_omits_unset_active_ai_model(tmp_path, monkeypatch):
+    """On-prem conflict detection should omit ai_model when no active model is set."""
+    from unittest.mock import MagicMock
+
+    from memanto.app.services import daily_analysis_service as module
+
+    sessions_dir = tmp_path / "sessions"
+    summaries_dir = tmp_path / "summaries"
+    sessions_dir.mkdir()
+    (sessions_dir / "agent-1_2026-06-28_001_summary.md").write_text(
+        "# Session\n\nRemembered a project milestone.",
+        encoding="utf-8",
+    )
+
+    client = MagicMock()
+    client.answer.generate.return_value = {"answer": "[]"}
+    monkeypatch.setattr(module, "get_moorcheh_client", lambda: client)
+    monkeypatch.setattr(module, "get_active_llm_model", lambda _: None)
+    monkeypatch.setattr(module.Path, "home", classmethod(lambda cls: tmp_path))
+
+    service = module.DailyAnalysisService(
+        sessions_dir=sessions_dir,
+        summaries_dir=summaries_dir,
+    )
+    result = service.generate_conflict_report("agent-1", "2026-06-28")
+
+    assert result["status"] == "success"
+    call_kwargs = client.answer.generate.call_args.kwargs
+    assert "ai_model" not in call_kwargs
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
