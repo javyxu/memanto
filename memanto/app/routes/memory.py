@@ -164,6 +164,10 @@ def resolve_recall_limit(request_limit: int | None) -> int:
     except (TypeError, ValueError) as e:
         raise HTTPException(
             status_code=400, detail=f"Invalid recall configuration: {e}"
+        ) from e
+    if limit < 1:
+        raise HTTPException(
+            status_code=400, detail="Invalid recall configuration: limit must be >= 1"
         )
     CostGuard.validate_k_limit(limit)
     return limit
