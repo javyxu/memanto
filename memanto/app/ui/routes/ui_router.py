@@ -5,6 +5,7 @@ Serves the Web UI static files and provides UI-specific API endpoints.
 """
 
 import os
+import re
 import signal
 import time
 from pathlib import Path
@@ -28,6 +29,21 @@ _config_manager = ConfigManager()
 
 # Path to the static directory
 STATIC_DIR = Path(__file__).parent.parent / "static"
+_SAFE_AGENT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+_SAFE_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _validate_agent_id(agent_id: str) -> None:
+    """Reject agent identifiers that cannot be safely embedded in file paths."""
+    if not _SAFE_AGENT_ID_RE.fullmatch(agent_id):
+        raise HTTPException(status_code=400, detail="Invalid agent identifier")
+
+
+def _validate_summary_key(agent_id: str, date: str) -> None:
+    """Validate the agent/date pair before building summary or conflict paths."""
+    if not _SAFE_DATE_RE.fullmatch(date):
+        raise HTTPException(status_code=400, detail="Invalid summary identifier")
+    _validate_agent_id(agent_id)
 
 
 def _build_ui_direct_client() -> DirectClient | None:
@@ -370,6 +386,7 @@ async def list_conflicts(agent_id: str | None = None, date: str | None = None):
         agent_id = aid
     if not date:
         date = dt.now().strftime("%Y-%m-%d")
+    _validate_summary_key(str(agent_id), str(date))
 
     try:
         client = _build_ui_direct_client()
@@ -404,6 +421,7 @@ async def list_conflict_scans(agent_id: str | None = None):
         if not aid:
             return {"scans": {}, "agent_id": None}
         agent_id = aid
+    _validate_agent_id(str(agent_id))
 
     conflicts_dir = Path.home() / ".memanto" / "conflicts"
     scans: dict[str, dict] = {}
@@ -456,6 +474,7 @@ async def read_daily_summary(agent_id: str | None = None, date: str | None = Non
     if not date:
         date = dt.now().strftime("%Y-%m-%d")
 
+    _validate_summary_key(str(agent_id), str(date))
     path = get_data_dir() / "summaries" / f"{agent_id}_{date}.md"
     if not path.exists():
         return {
@@ -481,8 +500,7 @@ async def read_daily_summary(agent_id: str | None = None, date: str | None = Non
 async def generate_daily_summary(body: dict | None = None):
     """
     Trigger an on-demand daily summary for the active agent.
-    Expects (optional): {"agent_id": "...", "date": "YYYY-MM-DD",
-                         "output_path": "..."}
+    Expects (optional): {"agent_id": "...", "date": "YYYY-MM-DD"}
     """
     from datetime import datetime as dt
 
@@ -494,7 +512,7 @@ async def generate_daily_summary(body: dict | None = None):
             raise HTTPException(status_code=400, detail="No active agent")
         agent_id = aid
     date = body.get("date") or dt.now().strftime("%Y-%m-%d")
-    output_path = body.get("output_path")
+    _validate_summary_key(str(agent_id), str(date))
 
     client = _build_ui_direct_client()
     if client is None:
@@ -502,7 +520,7 @@ async def generate_daily_summary(body: dict | None = None):
 
     try:
         result = client.generate_daily_summary(
-            agent_id=str(agent_id), date=str(date), output_path=output_path
+            agent_id=str(agent_id), date=str(date), output_path=None
         )
         return {"agent_id": agent_id, "date": date, **result}
     except Exception as e:
@@ -526,6 +544,7 @@ async def generate_conflict_report(body: dict | None = None):
             raise HTTPException(status_code=400, detail="No active agent")
         agent_id = aid
     date = body.get("date") or dt.now().strftime("%Y-%m-%d")
+    _validate_summary_key(str(agent_id), str(date))
 
     client = _build_ui_direct_client()
     if client is None:
@@ -560,6 +579,7 @@ async def resolve_conflict(body: dict):
             status_code=400,
             detail="agent_id, date, conflict_index, and action are required",
         )
+    _validate_summary_key(agent_id, date)
 
     try:
         client = _build_ui_direct_client()

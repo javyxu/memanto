@@ -119,6 +119,29 @@ class TestSessionService:
         print("✅ Session ended successfully")
         print(f"   Duration: {summary.duration_hours} hours")
 
+    def test_settings_default_does_not_embed_public_jwt_secret(self, monkeypatch):
+        """Default settings must not contain the publicly known JWT secret."""
+        from memanto.app.config import Settings
+
+        monkeypatch.delenv("MEMANTO_SECRET_KEY", raising=False)
+
+        assert Settings(_env_file=None).MEMANTO_SECRET_KEY == ""
+
+    def test_missing_session_secret_generates_unique_fallback(
+        self, temp_dir, monkeypatch
+    ):
+        """Missing MEMANTO_SECRET_KEY should not reuse a predictable JWT secret."""
+        monkeypatch.delenv("MEMANTO_SECRET_KEY", raising=False)
+        monkeypatch.setattr(settings, "MEMANTO_SECRET_KEY", "")
+
+        first = SessionService(sessions_dir=temp_dir / "sessions-1")
+        second = SessionService(sessions_dir=temp_dir / "sessions-2")
+
+        assert first.secret_key != "memanto-default-secret-change-in-production"
+        assert second.secret_key != "memanto-default-secret-change-in-production"
+        assert first.secret_key != second.secret_key
+        assert len(first.secret_key) >= 32
+
     def test_get_active_session_ignores_invalid_session_file(self, session_service):
         """A corrupt active session file should not crash status checks."""
         active_marker = session_service.sessions_dir / "active"
