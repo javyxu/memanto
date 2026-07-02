@@ -11,6 +11,7 @@ Verifies that:
 
 import pytest
 
+
 # Use monkeypatch / fixtures so the env override doesn't bleed into other tests.
 @pytest.fixture(autouse=True)
 def _set_api_key(monkeypatch):
@@ -22,11 +23,13 @@ class TestCorsCredentialsDefault:
 
     def test_default_is_false(self):
         from memanto.app.config import Settings
+
         s = Settings()
         assert s.CORS_ALLOW_CREDENTIALS is False
 
     def test_explicit_true_accepted(self):
         from memanto.app.config import Settings
+
         s = Settings(CORS_ALLOW_CREDENTIALS=True)
         assert s.CORS_ALLOW_CREDENTIALS is True
 
@@ -36,6 +39,7 @@ class TestValidateCorsSettings:
 
     def _guard(self, allowed_origins, allow_credentials):
         from memanto.app.main import _validate_cors_settings
+
         _validate_cors_settings(allowed_origins, allow_credentials)
 
     def test_wildcard_with_credentials_raises(self):
@@ -59,14 +63,19 @@ class TestCorsHeaderBehavior:
     async def test_no_credentials_header_with_wildcard(self):
         """With wildcard origins + credentials=False, Access-Control-Allow-Credentials
         must not be 'true' — otherwise browsers allow credentialed cross-origin requests."""
-        import httpx
         from unittest.mock import patch
 
-        with patch("memanto.app.main._validate_startup_dependencies", return_value=None):
+        import httpx
+
+        with patch(
+            "memanto.app.main._validate_startup_dependencies", return_value=None
+        ):
             from memanto.app.main import app
 
         transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as ac:
             resp = await ac.get("/health", headers={"Origin": "https://evil.com"})
 
         cred_header = resp.headers.get("access-control-allow-credentials", "").lower()
@@ -77,14 +86,19 @@ class TestCorsHeaderBehavior:
     async def test_wildcard_returns_star_not_reflected_origin(self):
         """With wildcard + credentials=False, Starlette returns '*', not the request Origin.
         A reflected Origin here would prove credentials mode is still active."""
-        import httpx
         from unittest.mock import patch
 
-        with patch("memanto.app.main._validate_startup_dependencies", return_value=None):
+        import httpx
+
+        with patch(
+            "memanto.app.main._validate_startup_dependencies", return_value=None
+        ):
             from memanto.app.main import app
 
         transport = httpx.ASGITransport(app=app)
-        async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as ac:
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://testserver"
+        ) as ac:
             resp = await ac.get("/health", headers={"Origin": "https://evil.com"})
 
         origin_header = resp.headers.get("access-control-allow-origin", "")

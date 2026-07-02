@@ -81,7 +81,6 @@ async def _require_local(request: Request) -> None:
         )
 
 
-
 def _build_ui_direct_client() -> DirectClient | None:
     """Build a ``DirectClient`` for UI routes with the active session restored.
 
@@ -408,7 +407,11 @@ async def update_api_key(body: dict, _: None = Depends(_require_local)):
 
 
 @router.get("/api/ui/conflicts")
-async def list_conflicts(agent_id: str | None = None, date: str | None = None, _: None = Depends(_require_local)):
+async def list_conflicts(
+    agent_id: str | None = None,
+    date: str | None = None,
+    _: None = Depends(_require_local),
+):
     """
     List unresolved conflicts for an agent.
     Uses DirectClient.list_conflicts under the hood.
@@ -416,7 +419,7 @@ async def list_conflicts(agent_id: str | None = None, date: str | None = None, _
     from datetime import datetime as dt
 
     if not agent_id:
-        aid, _ = _config_manager.get_active_session()
+        aid, _session_token = _config_manager.get_active_session()
         if not aid:
             return {"conflicts": [], "count": 0, "message": "No active agent"}
         agent_id = aid
@@ -440,7 +443,9 @@ async def list_conflicts(agent_id: str | None = None, date: str | None = None, _
 
 
 @router.get("/api/ui/conflict-scans")
-async def list_conflict_scans(agent_id: str | None = None, _: None = Depends(_require_local)):
+async def list_conflict_scans(
+    agent_id: str | None = None, _: None = Depends(_require_local)
+):
     """
     Return, per day, when the conflict scan last ran for an agent.
 
@@ -453,7 +458,7 @@ async def list_conflict_scans(agent_id: str | None = None, _: None = Depends(_re
     from datetime import datetime as dt
 
     if not agent_id:
-        aid, _ = _config_manager.get_active_session()
+        aid, _session_token = _config_manager.get_active_session()
         if not aid:
             return {"scans": {}, "agent_id": None}
         agent_id = aid
@@ -461,7 +466,9 @@ async def list_conflict_scans(agent_id: str | None = None, _: None = Depends(_re
 
     # Guard against glob-special characters that would leak cross-agent conflict data
     if not re.match(r"^[A-Za-z0-9_-]+$", agent_id):
-        raise HTTPException(status_code=400, detail="Invalid agent_id: must match [A-Za-z0-9_-]+")
+        raise HTTPException(
+            status_code=400, detail="Invalid agent_id: must match [A-Za-z0-9_-]+"
+        )
 
     conflicts_dir = Path.home() / ".memanto" / "conflicts"
     scans: dict[str, dict] = {}
@@ -495,7 +502,11 @@ async def list_conflict_scans(agent_id: str | None = None, _: None = Depends(_re
 
 
 @router.get("/api/ui/daily-summary")
-async def read_daily_summary(agent_id: str | None = None, date: str | None = None, _: None = Depends(_require_local)):
+async def read_daily_summary(
+    agent_id: str | None = None,
+    date: str | None = None,
+    _: None = Depends(_require_local),
+):
     """
     Return the existing daily summary for an agent/date if one was already
     generated. Does NOT trigger generation — that's the POST endpoint.
@@ -507,7 +518,7 @@ async def read_daily_summary(agent_id: str | None = None, date: str | None = Non
     from memanto.app.config import get_data_dir
 
     if not agent_id:
-        aid, _ = _config_manager.get_active_session()
+        aid, _session_token = _config_manager.get_active_session()
         if not aid:
             return {"exists": False, "message": "No active agent"}
         agent_id = aid
@@ -537,7 +548,9 @@ async def read_daily_summary(agent_id: str | None = None, date: str | None = Non
 
 
 @router.post("/api/ui/daily-summary")
-async def generate_daily_summary(body: dict | None = None, _: None = Depends(_require_local)):
+async def generate_daily_summary(
+    body: dict | None = None, _: None = Depends(_require_local)
+):
     """
     Trigger an on-demand daily summary for the active agent.
     Expects (optional): {"agent_id": "...", "date": "YYYY-MM-DD"}
@@ -547,7 +560,7 @@ async def generate_daily_summary(body: dict | None = None, _: None = Depends(_re
     body = body or {}
     agent_id = body.get("agent_id")
     if not agent_id:
-        aid, _ = _config_manager.get_active_session()
+        aid, _session_token = _config_manager.get_active_session()
         if not aid:
             raise HTTPException(status_code=400, detail="No active agent")
         agent_id = aid
@@ -568,7 +581,9 @@ async def generate_daily_summary(body: dict | None = None, _: None = Depends(_re
 
 
 @router.post("/api/ui/conflicts/generate")
-async def generate_conflict_report(body: dict | None = None, _: None = Depends(_require_local)):
+async def generate_conflict_report(
+    body: dict | None = None, _: None = Depends(_require_local)
+):
     """
     Trigger an on-demand conflict report for the active agent. This is the
     same work the scheduled task performs.
@@ -579,7 +594,7 @@ async def generate_conflict_report(body: dict | None = None, _: None = Depends(_
     body = body or {}
     agent_id = body.get("agent_id")
     if not agent_id:
-        aid, _ = _config_manager.get_active_session()
+        aid, _session_token = _config_manager.get_active_session()
         if not aid:
             raise HTTPException(status_code=400, detail="No active agent")
         agent_id = aid

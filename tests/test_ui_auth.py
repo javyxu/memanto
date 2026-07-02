@@ -1,14 +1,16 @@
 """Tests for unauthenticated UI endpoint vulnerability fix."""
+
 import asyncio
-import pytest
-from fastapi.testclient import TestClient
 from unittest.mock import MagicMock
+
+from fastapi.testclient import TestClient
 
 
 def _make_app():
     """Create a minimal FastAPI app with just the UI router, bypassing startup deps."""
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
+
     from memanto.app.ui.routes.ui_router import router as ui_router
 
     app = FastAPI()
@@ -72,33 +74,40 @@ class TestLoopbackDetection:
 
     def test_ipv4_loopback_accepted(self):
         from memanto.app.ui.routes.ui_router import _is_loopback
+
         assert _is_loopback("127.0.0.1") is True
 
     def test_ipv6_loopback_accepted(self):
         from memanto.app.ui.routes.ui_router import _is_loopback
+
         assert _is_loopback("::1") is True
 
     def test_ipv4_mapped_ipv6_loopback_accepted(self):
         """::ffff:127.0.0.1 is the IPv4-mapped form of 127.0.0.1 — must pass."""
         from memanto.app.ui.routes.ui_router import _is_loopback
+
         assert _is_loopback("::ffff:127.0.0.1") is True
 
     def test_remote_ipv4_rejected(self):
         from memanto.app.ui.routes.ui_router import _is_loopback
+
         assert _is_loopback("192.168.1.100") is False
 
     def test_none_rejected(self):
         from memanto.app.ui.routes.ui_router import _is_loopback
+
         assert _is_loopback(None) is False
 
     def test_testclient_host_rejected(self):
         """Starlette TestClient sends host="testclient" — must be treated as remote."""
         from memanto.app.ui.routes.ui_router import _is_loopback
+
         assert _is_loopback("testclient") is False
 
     def test_require_local_allows_loopback(self):
         """_require_local must not raise for a 127.0.0.1 caller."""
         from memanto.app.ui.routes.ui_router import _require_local
+
         mock_request = MagicMock()
         mock_request.client.host = "127.0.0.1"
         asyncio.run(_require_local(mock_request))  # must not raise
@@ -106,6 +115,7 @@ class TestLoopbackDetection:
     def test_require_local_allows_ipv4_mapped_loopback(self):
         """_require_local must not raise for a ::ffff:127.0.0.1 caller."""
         from memanto.app.ui.routes.ui_router import _require_local
+
         mock_request = MagicMock()
         mock_request.client.host = "::ffff:127.0.0.1"
         asyncio.run(_require_local(mock_request))  # must not raise

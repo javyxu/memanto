@@ -72,7 +72,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-def _validate_cors_settings(allowed_origins: list[str], allow_credentials: bool) -> None:
+
+def _validate_cors_settings(
+    allowed_origins: list[str], allow_credentials: bool
+) -> None:
     """Raise ValueError when wildcard origins and allow_credentials are combined.
 
     Starlette reflects the request Origin (instead of returning '*') when both

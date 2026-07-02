@@ -510,7 +510,7 @@ class MemoryReadService:
         """Keep only results whose numeric confidence meets the threshold."""
         filtered: list[dict[str, Any]] = []
         for result in results:
-            raw_confidence = result.get("confidence")
+            raw_confidence: Any = result.get("confidence")
             try:
                 confidence = float(raw_confidence)
             except (TypeError, ValueError):

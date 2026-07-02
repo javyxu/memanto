@@ -2,6 +2,7 @@
 Input Validation and Cost Guards for MEMANTO
 """
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -162,9 +163,6 @@ def validate_request_size(
         )
 
 
-import re
-
-
 def validate_safe_id(value: str, field_name: str = "id") -> str:
     """
     Reject agent_id / session_id values that would escape the storage directory.
@@ -178,7 +176,7 @@ def validate_safe_id(value: str, field_name: str = "id") -> str:
     """
     if not value:
         raise ValueError(f"{field_name} must not be empty")
-    if not re.match(r'^[A-Za-z0-9_-]+$', value):
+    if not re.match(r"^[A-Za-z0-9_-]+$", value):
         raise ValueError(
             f"{field_name} '{value}' contains invalid characters. "
             "Only letters, digits, hyphens, and underscores are allowed."
@@ -186,7 +184,9 @@ def validate_safe_id(value: str, field_name: str = "id") -> str:
     return value
 
 
-def validate_output_path(output_path: str | None, base_dir: Path | None = None) -> Path | None:
+def validate_output_path(
+    output_path: str | None, base_dir: Path | None = None
+) -> Path | None:
     """Restrict *output_path* to a safe base directory to prevent path traversal writes.
 
     An authenticated caller who supplies ``output_path="/etc/cron.d/evil"`` could

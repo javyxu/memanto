@@ -7,7 +7,6 @@ Uses JWT tokens for stateless authentication.
 
 import json
 import logging
-import os
 import secrets
 from datetime import timedelta
 from pathlib import Path
