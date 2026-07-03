@@ -361,6 +361,31 @@ class TestMemoryWriteServiceDelete:
         client.documents.upload.assert_called_once()
 
 
+class TestMemoryReadServiceFormatting:
+    def test_format_memory_item_preserves_falsey_metadata_values(self):
+        from memanto.app.services.memory_read_service import MemoryReadService
+
+        item = {
+            "id": "m-low",
+            "text": "[FACT] Low confidence\n\nThis memory is intentionally weak.",
+            "metadata": {
+                "memory_type": "fact",
+                "confidence": 0.0,
+                "status": "active",
+                "tags": [],
+                "validation_count": 0,
+                "contradiction_detected": False,
+            },
+        }
+
+        formatted = MemoryReadService(MagicMock())._format_memory_item(item)
+
+        assert formatted["confidence"] == 0.0
+        assert formatted["tags"] == []
+        assert formatted["validation_count"] == 0
+        assert formatted["contradiction_detected"] is False
+
+
 class TestForgetEndToEnd:
     """End-to-end ``forget`` flow through ``DirectClient``: create agent →
     activate → delete_memory. Asserts on-prem's response shape
