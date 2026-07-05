@@ -871,6 +871,7 @@ class SdkClient:
         as_of: str,
         limit: int | None = None,
         type: list[str] | None = None,
+        tags: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         Point-in-time recall: what memories existed at a given moment?
@@ -880,6 +881,7 @@ class SdkClient:
             as_of: ISO-8601 date/datetime string.
             limit: Max results (defaults to config).
             type: Optional type filter.
+            tags: Optional tag filter.
 
         Returns:
             Dict with ``memories`` and ``count``.
@@ -894,6 +896,7 @@ class SdkClient:
             as_of_date=as_of,
             agent_id=agent_id,
             type=type,
+            tags=tags,
             limit=limit,
         )
 
@@ -910,6 +913,7 @@ class SdkClient:
         since: str,
         limit: int | None = None,
         type: list[str] | None = None,
+        tags: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         Differential retrieval: what changed since a given date?
@@ -919,6 +923,7 @@ class SdkClient:
             since: ISO-8601 date/datetime string.
             limit: Max results (defaults to config).
             type: Optional type filter.
+            tags: Optional tag filter.
 
         Returns:
             Dict with ``memories`` and ``count``.
@@ -933,6 +938,7 @@ class SdkClient:
             since_date=since,
             agent_id=agent_id,
             type=type,
+            tags=tags,
             limit=limit,
         )
 
@@ -948,6 +954,7 @@ class SdkClient:
         agent_id: str,
         limit: int | None = None,
         type: list[str] | None = None,
+        tags: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         Recall the most recently stored memories (newest first).
@@ -956,6 +963,7 @@ class SdkClient:
             agent_id: Target agent.
             limit: Max results (defaults to config).
             type: Optional type filter.
+            tags: Optional tag filter.
 
         Returns:
             Dict with ``memories`` and ``count``.
@@ -969,6 +977,7 @@ class SdkClient:
         result = self._get_read_service().search_recent(
             agent_id=agent_id,
             type=type,
+            tags=tags,
             limit=limit,
         )
 

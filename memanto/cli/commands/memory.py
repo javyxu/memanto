@@ -546,6 +546,7 @@ def recall(
                     as_of=as_of,
                     limit=limit,
                     type=type,
+                    tags=tag_list,
                 )
                 temporal_mode = "as_of"
             elif changed_since:
@@ -554,6 +555,7 @@ def recall(
                     since=changed_since,
                     limit=limit,
                     type=type,
+                    tags=tag_list,
                 )
                 temporal_mode = "changed_since"
             elif recent:
@@ -561,6 +563,7 @@ def recall(
                     agent_id=agent_id,
                     limit=limit,
                     type=type,
+                    tags=tag_list,
                 )
                 temporal_mode = "recent"
             elif query:

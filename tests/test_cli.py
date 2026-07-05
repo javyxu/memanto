@@ -489,6 +489,19 @@ class TestMEMANTOCLI:
         call_kwargs = mock_all_clients.recall_recent.call_args.kwargs
         assert call_kwargs["limit"] == 5
 
+    def test_recall_recent_forwards_tags(self, mock_all_clients):
+        """`memanto recall --recent --tags` forwards tag filters."""
+        mock_all_clients.recall_recent.return_value = {"memories": [], "count": 0}
+
+        result = runner.invoke(
+            app,
+            ["recall", "--recent", "--tags", "release, backend", "--limit", "5"],
+        )
+
+        assert result.exit_code == 0
+        call_kwargs = mock_all_clients.recall_recent.call_args.kwargs
+        assert call_kwargs["tags"] == ["release", "backend"]
+
     def test_recall_recent_rejects_query(self, mock_all_clients):
         """`--recent` is chronological; passing a query alongside is an error."""
         result = runner.invoke(app, ["recall", "some query", "--recent"])

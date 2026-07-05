@@ -309,6 +309,7 @@ class MemoryReadService:
         self,
         agent_id: str,
         type: list[str] | None = None,
+        tags: list[str] | None = None,
         limit: int | None = 10,
     ) -> dict[str, Any]:
         """
@@ -317,6 +318,7 @@ class MemoryReadService:
         Args:
             agent_id: Agent whose memories to search
             type: Optional memory type filters
+            tags: Optional tag filters
             limit: Max results to return
         """
         try:
@@ -326,7 +328,9 @@ class MemoryReadService:
             if not namespaces:
                 return {"results": [], "total_found": 0}
 
-            unique_memories = self._fetch_all_memories(namespaces, type=type)
+            unique_memories = self._fetch_all_memories(
+                namespaces, type=type, tags=tags
+            )
 
             # Sort by created_at descending (most recent first)
             def _created_sort_key(m: dict[str, Any]) -> str:
