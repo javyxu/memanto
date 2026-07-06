@@ -10,11 +10,12 @@ interface Recorded {
   body: string;
 }
 
-function startFakeApi(): Promise<{
+function startFakeApi(agentId = "test-agent"): Promise<{
   url: string;
   recorded: Recorded[];
   close: () => void;
 }> {
+  const encodedAgentId = encodeURIComponent(agentId);
   return new Promise((resolve) => {
     const recorded: Recorded[] = [];
     const srv: Server = createServer((req, res) => {
@@ -33,10 +34,10 @@ function startFakeApi(): Promise<{
         };
 
         if (url === "/health") return reply(200, { status: "ok" });
-        if (url.startsWith("/api/v2/agents/test-agent/activate"))
+        if (url.startsWith(`/api/v2/agents/${encodedAgentId}/activate`))
           return reply(200, {
             session_token: "fake-token",
-            agent_id: "test-agent",
+            agent_id: agentId,
             session_id: "sess-1",
             namespace: "memanto_agent_test_agent",
             started_at: new Date().toISOString(),
@@ -44,16 +45,16 @@ function startFakeApi(): Promise<{
             status: "active",
             pattern: "default",
           });
-        if (url === "/api/v2/agents/test-agent" && req.method === "GET")
+        if (url === `/api/v2/agents/${encodedAgentId}` && req.method === "GET")
           return reply(404, { detail: "not found" });
         if (url === "/api/v2/agents" && req.method === "POST")
-          return reply(201, { agent_id: "test-agent" });
-        if (url === "/api/v2/agents/test-agent" && req.method === "DELETE")
-          return reply(200, { agent_id: "test-agent", deleted: true });
-        if (url === "/api/v2/agents/test-agent/remember")
+          return reply(201, { agent_id: agentId });
+        if (url === `/api/v2/agents/${encodedAgentId}` && req.method === "DELETE")
+          return reply(200, { agent_id: agentId, deleted: true });
+        if (url === `/api/v2/agents/${encodedAgentId}/remember`)
           return reply(200, {
             memory_id: "mem-1",
-            agent_id: "test-agent",
+            agent_id: agentId,
             session_id: "sess-1",
             namespace: "memanto_agent_test_agent",
             status: "queued",
@@ -61,9 +62,9 @@ function startFakeApi(): Promise<{
             confidence: 0.9,
             type: "fact",
           });
-        if (url === "/api/v2/agents/test-agent/recall")
+        if (url === `/api/v2/agents/${encodedAgentId}/recall`)
           return reply(200, {
-            agent_id: "test-agent",
+            agent_id: agentId,
             session_id: "sess-1",
             query: "anything",
             memories: [],
@@ -149,5 +150,32 @@ describe("Memanto", () => {
 
   it("rejects empty agentId", () => {
     expect(() => new Memanto({ agentId: "" })).toThrow(/agentId is required/);
+  });
+
+  it("percent-encodes agentId in URL path segments", async () => {
+    const agentId = "team/alpha?mode=prod#frag";
+    const api = await startFakeApi(agentId);
+    cleanupFns.push(api.close);
+
+    const m = new Memanto({ agentId, baseUrl: api.url });
+    cleanupFns.push(() => m.close());
+
+    await m.remember({ content: "Scoped agent ids must stay in one path segment" });
+
+    const encodedAgentId = encodeURIComponent(agentId);
+    expect(api.recorded.map((r) => r.url)).toContain(
+      `/api/v2/agents/${encodedAgentId}`,
+    );
+    expect(api.recorded.map((r) => r.url)).toContain(
+      `/api/v2/agents/${encodedAgentId}/activate`,
+    );
+    expect(api.recorded.map((r) => r.url)).toContain(
+      `/api/v2/agents/${encodedAgentId}/remember`,
+    );
+
+    const create = api.recorded.find(
+      (r) => r.method === "POST" && r.url === "/api/v2/agents",
+    );
+    expect(JSON.parse(create?.body ?? "{}")).toMatchObject({ agent_id: agentId });
   });
 });
