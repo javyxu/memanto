@@ -7,7 +7,12 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from memanto.app.constants import MemoryType, SourceType, StatusType
+from memanto.app.constants import (
+    VALID_PROVENANCE_TYPES,
+    MemoryType,
+    SourceType,
+    StatusType,
+)
 
 
 def _validate_non_blank_content(value: str) -> str:
@@ -95,6 +100,16 @@ class BatchRememberItem(BaseModel):
     def validate_content(cls, value: str) -> str:
         """Ensure session memory writes contain useful non-blank content."""
         return _validate_non_blank_content(value)
+
+    @field_validator("provenance")
+    @classmethod
+    def provenance_must_be_valid(cls, value: str) -> str:
+        if value not in VALID_PROVENANCE_TYPES:
+            valid_provenance = ", ".join(sorted(VALID_PROVENANCE_TYPES))
+            raise ValueError(
+                f"Invalid provenance '{value}'. Must be one of: {valid_provenance}."
+            )
+        return value
 
 
 class RememberRequest(BatchRememberItem):

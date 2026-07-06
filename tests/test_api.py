@@ -840,6 +840,34 @@ class TestMEMANTOAPI:
         mock_moorcheh.documents.upload.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_remember_rejects_invalid_provenance(
+        self, client, auth_headers, mock_moorcheh
+    ):
+        """Single remember should reject unknown provenance values before upload."""
+        await client.post(
+            "/api/v2/agents",
+            headers=auth_headers,
+            json={"agent_id": self.TEST_AGENT_ID},
+        )
+        activate_resp = await client.post(
+            f"/api/v2/agents/{self.TEST_AGENT_ID}/activate", headers=auth_headers
+        )
+        token = activate_resp.json()["session_token"]
+
+        headers = {**auth_headers, "X-Session-Token": token}
+        response = await client.post(
+            f"/api/v2/agents/{self.TEST_AGENT_ID}/remember",
+            headers=headers,
+            json={
+                "content": "Invalid provenance should not be stored",
+                "provenance": "guessed",
+            },
+        )
+
+        assert response.status_code == 422
+        mock_moorcheh.documents.upload.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_global_status_no_active_session(self, client):
         """Test GET /api/v2/status returns 404 when no session is active"""
         response = await client.get("/api/v2/status")
@@ -896,6 +924,39 @@ class TestMEMANTOAPI:
             f"/api/v2/agents/{self.TEST_AGENT_ID}/batch-remember",
             headers=headers,
             json={"memories": [{"content": "   "}]},
+        )
+
+        assert response.status_code == 422
+        mock_moorcheh.documents.upload.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_batch_remember_rejects_invalid_provenance(
+        self, client, auth_headers, mock_moorcheh
+    ):
+        """Batch remember should reject unknown provenance values before upload."""
+        await client.post(
+            "/api/v2/agents",
+            headers=auth_headers,
+            json={"agent_id": self.TEST_AGENT_ID},
+        )
+        activate_resp = await client.post(
+            f"/api/v2/agents/{self.TEST_AGENT_ID}/activate", headers=auth_headers
+        )
+        token = activate_resp.json()["session_token"]
+
+        headers = {**auth_headers, "X-Session-Token": token}
+        response = await client.post(
+            f"/api/v2/agents/{self.TEST_AGENT_ID}/batch-remember",
+            headers=headers,
+            json={
+                "memories": [
+                    {
+                        "content": "Invalid provenance should not be batched",
+                        "type": "fact",
+                        "provenance": "guessed",
+                    }
+                ]
+            },
         )
 
         assert response.status_code == 422
