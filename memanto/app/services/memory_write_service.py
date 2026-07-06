@@ -47,6 +47,7 @@ class MemoryWriteService:
             return
         memory.created_at = now
         memory.updated_at = now
+
     def store_memory(
         self, memory: MemoryRecord, context: dict[str, Any] | None = None
     ) -> dict[str, Any]:
