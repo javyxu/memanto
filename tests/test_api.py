@@ -1005,6 +1005,64 @@ class TestMEMANTOAPI:
         mock_moorcheh.documents.upload.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_extract_memories_rejects_blank_message_content(
+        self, client, auth_headers, mock_moorcheh
+    ):
+        """Whitespace-only message content should fail before extraction."""
+        await client.post(
+            "/api/v2/agents",
+            headers=auth_headers,
+            json={"agent_id": self.TEST_AGENT_ID},
+        )
+        activate_resp = await client.post(
+            f"/api/v2/agents/{self.TEST_AGENT_ID}/activate", headers=auth_headers
+        )
+        assert activate_resp.status_code == 200, activate_resp.text
+        token = activate_resp.json()["session_token"]
+        headers = {**auth_headers, "X-Session-Token": token}
+
+        response = await client.post(
+            f"/api/v2/agents/{self.TEST_AGENT_ID}/remember/extract",
+            headers=headers,
+            json={
+                "dry_run": True,
+                "messages": [{"role": "user", "content": " \n\t "}],
+            },
+        )
+
+        assert response.status_code == 422
+        mock_moorcheh.answer.generate.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_extract_memories_rejects_blank_message_role(
+        self, client, auth_headers, mock_moorcheh
+    ):
+        """Whitespace-only message roles should fail before extraction."""
+        await client.post(
+            "/api/v2/agents",
+            headers=auth_headers,
+            json={"agent_id": self.TEST_AGENT_ID},
+        )
+        activate_resp = await client.post(
+            f"/api/v2/agents/{self.TEST_AGENT_ID}/activate", headers=auth_headers
+        )
+        assert activate_resp.status_code == 200, activate_resp.text
+        token = activate_resp.json()["session_token"]
+        headers = {**auth_headers, "X-Session-Token": token}
+
+        response = await client.post(
+            f"/api/v2/agents/{self.TEST_AGENT_ID}/remember/extract",
+            headers=headers,
+            json={
+                "dry_run": True,
+                "messages": [{"role": " \t ", "content": "Useful memory."}],
+            },
+        )
+
+        assert response.status_code == 422
+        mock_moorcheh.answer.generate.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_extract_memories_from_conversation_stores_batch(
         self, client, auth_headers, mock_moorcheh
     ):
