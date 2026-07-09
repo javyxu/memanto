@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from httpx import ASGITransport, AsyncClient
+from httpx import ASGITransport, AsyncClient, Cookies
 
 from memanto.app.config import settings
 from memanto.app.main import app
@@ -1993,6 +1993,13 @@ class TestCWE200ApiKeyLeak:
         against the persisted record). Browser callers authenticate purely via
         the cookie, so if the renewed token isn't written back into a new
         Set-Cookie, the very next request fails with InvalidSessionTokenError.
+
+        Cookies are swapped via a fresh httpx.Cookies() jar rather than
+        client.cookies.set(name, value): .set() defaults to domain="", which
+        differs from the domain httpx auto-records from the server's
+        Set-Cookie response, so it creates a *second* same-name cookie
+        instead of replacing the first — sending both to the server and
+        leaving the outcome to depend on how its cookie parser breaks the tie.
         """
         await client.post(
             "/api/v2/agents",
@@ -2004,6 +2011,7 @@ class TestCWE200ApiKeyLeak:
         )
         assert activate_resp.status_code == 200
         old_token = activate_resp.json()["session_token"]
+        client.cookies = Cookies()
         client.cookies.set("memanto_session_token", old_token)
 
         # Force the existing session to look near-expiry so the next request
@@ -2023,6 +2031,7 @@ class TestCWE200ApiKeyLeak:
         assert new_token != old_token
 
         # The old (now-superseded) token must no longer authenticate.
+        client.cookies = Cookies()
         client.cookies.set("memanto_session_token", old_token)
         stale_response = await client.post(
             f"/api/v2/agents/{self.TEST_AGENT_ID}/recall/recent",
