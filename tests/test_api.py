@@ -163,15 +163,18 @@ class TestMEMANTOAPI:
         assert "metadata" not in data
 
     @pytest.mark.asyncio
-    async def test_create_agent_without_authorization_header(self, client):
-        """Test creating a new agent using server-configured API key"""
-        payload = {
-            "agent_id": "server-key-agent",
-            "pattern": "support",
-        }
-        response = await client.post("/api/v2/agents", json=payload)
-        assert response.status_code == 201
-        assert response.json()["agent_id"] == "server-key-agent"
+    async def test_create_agent_without_authorization_header_is_rejected(self):
+        """Non-loopback callers must present a management credential."""
+        # httpx ASGITransport defaults to client 127.0.0.1 (loopback). Force a
+        # remote peer so we exercise the network-facing auth path.
+        transport = ASGITransport(app=app, client=("203.0.113.10", 54321))
+        async with AsyncClient(transport=transport, base_url="http://test") as remote:
+            payload = {
+                "agent_id": "server-key-agent",
+                "pattern": "support",
+            }
+            response = await remote.post("/api/v2/agents", json=payload)
+            assert response.status_code == 401
 
     @pytest.mark.asyncio
     async def test_create_agent_fails_when_server_key_missing(self, client):
@@ -183,6 +186,56 @@ class TestMEMANTOAPI:
         with patch.object(settings, "MOORCHEH_API_KEY", ""):
             response = await client.post("/api/v2/agents", json=payload)
         assert response.status_code == 500
+
+    @pytest.mark.asyncio
+    async def test_remote_create_agent_requires_matching_credential(self):
+        """Bearer token must match the configured management key."""
+        transport = ASGITransport(app=app, client=("203.0.113.10", 54321))
+        async with AsyncClient(transport=transport, base_url="http://test") as remote:
+            payload = {"agent_id": "wrong-key-agent", "pattern": "support"}
+            response = await remote.post(
+                "/api/v2/agents",
+                headers={"Authorization": "Bearer totally-wrong-key"},
+                json=payload,
+            )
+            assert response.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_remote_activate_without_credential_is_rejected(
+        self, client, auth_headers
+    ):
+        """Activation from a non-loopback client requires management credential."""
+        await client.post(
+            "/api/v2/agents",
+            headers=auth_headers,
+            json={"agent_id": "activate-auth-agent", "pattern": "support"},
+        )
+        transport = ASGITransport(app=app, client=("203.0.113.10", 54321))
+        async with AsyncClient(transport=transport, base_url="http://test") as remote:
+            response = await remote.post("/api/v2/agents/activate-auth-agent/activate")
+            assert response.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_remote_create_with_valid_credential_succeeds(self, auth_headers):
+        """Remote peer with the correct management key can still manage agents."""
+        transport = ASGITransport(app=app, client=("203.0.113.10", 54321))
+        async with AsyncClient(transport=transport, base_url="http://test") as remote:
+            response = await remote.post(
+                "/api/v2/agents",
+                headers=auth_headers,
+                json={"agent_id": "remote-ok-agent", "pattern": "support"},
+            )
+            assert response.status_code == 201
+            assert response.json()["agent_id"] == "remote-ok-agent"
+
+    @pytest.mark.asyncio
+    async def test_status_requires_management_access(self):
+        """Active session status must not be readable by unauthenticated remote peers."""
+        transport = ASGITransport(app=app, client=("203.0.113.10", 54321))
+        async with AsyncClient(transport=transport, base_url="http://test") as remote:
+            response = await remote.get("/api/v2/status")
+            assert response.status_code == 401
+
 
     @pytest.mark.asyncio
     async def test_list_agents(self, client, auth_headers):
@@ -675,7 +728,7 @@ class TestMEMANTOAPI:
         )
 
         assert response.status_code == 200
-        status_resp = await client.get("/api/v2/status")
+        status_resp = await client.get("/api/v2/status", headers=auth_headers)
         assert status_resp.status_code == 404
 
         stale_headers = {**auth_headers, "X-Session-Token": token}
@@ -776,7 +829,7 @@ class TestMEMANTOAPI:
             f"/api/v2/agents/{self.TEST_AGENT_ID}/activate", headers=auth_headers
         )
 
-        response = await client.get("/api/v2/status")
+        response = await client.get("/api/v2/status", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         assert data["agent_id"] == self.TEST_AGENT_ID
@@ -899,9 +952,9 @@ class TestMEMANTOAPI:
         mock_moorcheh.documents.upload.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_global_status_no_active_session(self, client):
+    async def test_global_status_no_active_session(self, client, auth_headers):
         """Test GET /api/v2/status returns 404 when no session is active"""
-        response = await client.get("/api/v2/status")
+        response = await client.get("/api/v2/status", headers=auth_headers)
         assert response.status_code == 404
 
     @pytest.mark.asyncio
