@@ -37,7 +37,6 @@ from memanto.app.routes import memory  # noqa: E402
 from memanto.app.routes.auth_deps import (  # noqa: E402
     clear_session_cookie,
     get_current_session,
-    get_moorcheh_api_key,
     get_session_service,
     set_session_cookie,
     verify_moorcheh_api_key,
