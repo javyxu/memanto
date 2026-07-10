@@ -336,6 +336,7 @@ def _get_restart_lock() -> "asyncio.Lock":
     """Return (creating lazily) the module-level restart serialisation lock."""
     global _restart_lock
     import asyncio
+
     if _restart_lock is None:
         _restart_lock = asyncio.Lock()
     return _restart_lock

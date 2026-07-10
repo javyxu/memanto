@@ -17,8 +17,7 @@ def test_build_filtered_query_accepts_safe_filters():
     )
 
     assert query == (
-        "deployment notes #memory_type:fact #prod-db "
-        "#status:active #source:cli.import"
+        "deployment notes #memory_type:fact #prod-db #status:active #source:cli.import"
     )
 
 

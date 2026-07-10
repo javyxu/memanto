@@ -236,7 +236,6 @@ class TestMEMANTOAPI:
             response = await remote.get("/api/v2/status")
             assert response.status_code == 401
 
-
     @pytest.mark.asyncio
     async def test_list_agents(self, client, auth_headers):
         """Test listing agents"""
