@@ -3,7 +3,7 @@
   "info": {
     "title": "Memanto - Memory that AI Agents Love!",
     "description": "A memory layer service for agentic AI systems using Moorcheh SDK",
-    "version": "0.2.5.dev66+geb0c5eb"
+    "version": "0.0.0.dev0"
   },
   "paths": {
     "/health": {
@@ -763,7 +763,7 @@
           "Memory Operations"
         ],
         "summary": "Generate Daily Summary",
-        "description": "Generate the on-demand daily AI summary for an agent/date.\n\nConflict detection is a separate concern — see\nPOST ``/{agent_id}/conflicts/generate`` or the scheduled job.",
+        "description": "Generate the on-demand daily AI summary for an agent/date.\n\nConflict detection is a separate concern \u2014 see\nPOST ``/{agent_id}/conflicts/generate`` or the scheduled job.",
         "operationId": "generate_daily_summary_api_v2_agents__agent_id__daily_summary_post",
         "parameters": [
           {
@@ -2142,7 +2142,7 @@
           "Web UI"
         ],
         "summary": "Read Daily Summary",
-        "description": "Return the existing daily summary for an agent/date if one was already\ngenerated. Does NOT trigger generation — that's the POST endpoint.\n\nResponse: {exists, agent_id, date, path, content}",
+        "description": "Return the existing daily summary for an agent/date if one was already\ngenerated. Does NOT trigger generation \u2014 that's the POST endpoint.\n\nResponse: {exists, agent_id, date, path, content}",
         "operationId": "read_daily_summary_api_ui_daily_summary_get",
         "parameters": [
           {
@@ -2556,7 +2556,7 @@
           "Web UI"
         ],
         "summary": "Migrate Import",
-        "description": "Run an end-to-end migration.\n\nBody: ``{provider, file?, api_key?, agent_id?}``. Loads-or-exports,\nmaps, chunks at 100/req, and writes via ``DirectClient.batch_remember``.\nReturns numeric summary only — no LLM narrative.",
+        "description": "Run an end-to-end migration.\n\nBody: ``{provider, file?, api_key?, agent_id?}``. Loads-or-exports,\nmaps, chunks at 100/req, and writes via ``DirectClient.batch_remember``.\nReturns numeric summary only \u2014 no LLM narrative.",
         "operationId": "migrate_import_api_ui_migrate_import_post",
         "requestBody": {
           "content": {
@@ -2754,8 +2754,8 @@
             "anyOf": [
               {
                 "type": "integer",
-                "maximum": 100,
-                "minimum": 1
+                "maximum": 100.0,
+                "minimum": 1.0
               },
               {
                 "type": "null"
@@ -2768,8 +2768,8 @@
             "anyOf": [
               {
                 "type": "number",
-                "maximum": 1,
-                "minimum": 0
+                "maximum": 1.0,
+                "minimum": 0.0
               },
               {
                 "type": "null"
@@ -2782,8 +2782,8 @@
             "anyOf": [
               {
                 "type": "number",
-                "maximum": 2,
-                "minimum": 0
+                "maximum": 2.0,
+                "minimum": 0.0
               },
               {
                 "type": "null"
@@ -2906,8 +2906,8 @@
           },
           "confidence": {
             "type": "number",
-            "maximum": 1,
-            "minimum": 0,
+            "maximum": 1.0,
+            "minimum": 0.0,
             "title": "Confidence",
             "description": "Confidence score (0-1)",
             "default": 0.8
@@ -3113,7 +3113,7 @@
         "properties": {
           "conflict_index": {
             "type": "integer",
-            "minimum": 0,
+            "minimum": 0.0,
             "title": "Conflict Index",
             "description": "Conflict index to resolve"
           },
@@ -3248,8 +3248,8 @@
           },
           "max_memories": {
             "type": "integer",
-            "maximum": 100,
-            "minimum": 1,
+            "maximum": 100.0,
+            "minimum": 1.0,
             "title": "Max Memories",
             "description": "Maximum candidate memories to extract",
             "default": 20
@@ -3356,8 +3356,8 @@
             "anyOf": [
               {
                 "type": "number",
-                "maximum": 1,
-                "minimum": 0
+                "maximum": 1.0,
+                "minimum": 0.0
               },
               {
                 "type": "null"
@@ -3578,13 +3578,13 @@
             "type": "string",
             "format": "date-time",
             "title": "As Of",
-            "description": "Point-in-time — YYYY-MM-DD (defaults to end of day) or full ISO datetime e.g. 2025-11-01T14:30:00Z"
+            "description": "Point-in-time \u2014 YYYY-MM-DD (defaults to end of day) or full ISO datetime e.g. 2025-11-01T14:30:00Z"
           },
           "limit": {
             "anyOf": [
               {
                 "type": "integer",
-                "minimum": 1
+                "minimum": 1.0
               },
               {
                 "type": "null"
@@ -3622,13 +3622,13 @@
             "type": "string",
             "format": "date-time",
             "title": "Since",
-            "description": "Start of change window — YYYY-MM-DD (defaults to start of day) or full ISO datetime e.g. 2025-11-01T00:00:00Z"
+            "description": "Start of change window \u2014 YYYY-MM-DD (defaults to start of day) or full ISO datetime e.g. 2025-11-01T00:00:00Z"
           },
           "limit": {
             "anyOf": [
               {
                 "type": "integer",
-                "minimum": 1
+                "minimum": 1.0
               },
               {
                 "type": "null"
@@ -3666,7 +3666,7 @@
             "anyOf": [
               {
                 "type": "integer",
-                "minimum": 1
+                "minimum": 1.0
               },
               {
                 "type": "null"
@@ -3707,7 +3707,7 @@
             "anyOf": [
               {
                 "type": "integer",
-                "minimum": 1
+                "minimum": 1.0
               },
               {
                 "type": "null"
@@ -3720,8 +3720,8 @@
             "anyOf": [
               {
                 "type": "number",
-                "maximum": 1,
-                "minimum": 0
+                "maximum": 1.0,
+                "minimum": 0.0
               },
               {
                 "type": "null"
@@ -3839,8 +3839,8 @@
           },
           "confidence": {
             "type": "number",
-            "maximum": 1,
-            "minimum": 0,
+            "maximum": 1.0,
+            "minimum": 0.0,
             "title": "Confidence",
             "description": "Confidence score (0-1)",
             "default": 0.8
