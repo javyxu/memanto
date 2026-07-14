@@ -12,7 +12,9 @@ import json
 from pathlib import Path
 
 FALLBACK_VERSION = "0.0.0.dev0"
-VERSION_FILE = Path(__file__).resolve().parent.parent / "memanto" / "app" / "_version.py"
+VERSION_FILE = (
+    Path(__file__).resolve().parent.parent / "memanto" / "app" / "_version.py"
+)
 
 VERSION_FILE.write_text(f'__version__ = "{FALLBACK_VERSION}"\n')
 
