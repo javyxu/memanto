@@ -749,6 +749,14 @@ class TestMEMANTOCLI:
         assert result.exit_code != 0
         assert "multiple temporal query modes" in result.stdout
 
+    def test_recall_rejects_non_positive_relative_window(self, mock_all_clients):
+        """`last N days/hours` must require a positive lookback window."""
+        result = runner.invoke(app, ["recall", "--changed-since", "last -1 days"])
+
+        assert result.exit_code != 0
+        assert "Invalid timestamp format" in result.stdout
+        mock_all_clients.recall_changed_since.assert_not_called()
+
     @pytest.mark.parametrize(
         "client_class_path",
         [
