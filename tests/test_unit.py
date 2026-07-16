@@ -816,6 +816,33 @@ class TestMemoryWriteServiceTimestamps:
         assert before_store <= parsed_created_at <= after_store
 
 
+class TestRecallConfigValidation:
+    def test_set_recall_config_rejects_invalid_limit(self, tmp_path):
+        from memanto.cli.config.manager import ConfigManager
+
+        manager = ConfigManager(config_dir=tmp_path)
+
+        with pytest.raises(ValueError, match="limit must be an integer"):
+            manager.set_recall_config(limit=0)
+
+        with pytest.raises(ValueError, match="limit must be an integer"):
+            manager.set_recall_config(limit=101)
+
+        with pytest.raises(ValueError, match="limit must be an integer"):
+            manager.set_recall_config(limit=1.5)
+
+        with pytest.raises(ValueError, match="limit must be an integer"):
+            manager.set_recall_config(limit=True)
+
+    def test_set_recall_config_accepts_valid_limit(self, tmp_path):
+        from memanto.cli.config.manager import ConfigManager
+
+        manager = ConfigManager(config_dir=tmp_path)
+        manager.set_recall_config(limit=25)
+
+        assert manager.get_recall_config()["limit"] == 25
+
+
 class TestMEMANTOArchitecture:
     """Tests for MEMANTO architecture principles"""
 
