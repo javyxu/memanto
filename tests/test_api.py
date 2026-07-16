@@ -65,7 +65,9 @@ async def client():
 @pytest.fixture
 def auth_headers():
     """Return standard auth headers"""
-    return {"Authorization": "Bearer test-api-key"}
+    from memanto.app.config import settings
+
+    return {"Authorization": f"Bearer {settings.MOORCHEH_API_KEY}"}
 
 
 @pytest.fixture(autouse=True)

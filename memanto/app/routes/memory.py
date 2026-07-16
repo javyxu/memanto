@@ -342,6 +342,7 @@ async def batch_remember(
 
         memory_records = []
         for item in request.memories:
+            CostGuard.validate_text_length(item.content, "Memory content")
             title = item.title or (
                 item.content[:47] + "..." if len(item.content) > 50 else item.content
             )
