@@ -1572,6 +1572,152 @@ class TestMEMANTOAPI:
         assert response.json()["temporal_mode"] == "recent"
 
     @pytest.mark.asyncio
+    async def test_recall_recent_accepts_tag_filter(
+        self, client, auth_headers, mock_moorcheh
+    ):
+        """Test recall/recent forwards tags to temporal retrieval."""
+        await client.post(
+            "/api/v2/agents",
+            headers=auth_headers,
+            json={"agent_id": self.TEST_AGENT_ID},
+        )
+        activate_resp = await client.post(
+            f"/api/v2/agents/{self.TEST_AGENT_ID}/activate", headers=auth_headers
+        )
+        token = activate_resp.json()["session_token"]
+        headers = {**auth_headers, "X-Session-Token": token}
+
+        mock_moorcheh.documents.fetch_text_data.return_value = {
+            "items": [
+                {
+                    "id": "m1",
+                    "metadata": {
+                        "created_at": "2025-06-01T10:00:00",
+                        "tags": "release,backend",
+                    },
+                    "text": "release note",
+                },
+                {
+                    "id": "m2",
+                    "metadata": {
+                        "created_at": "2025-06-02T10:00:00",
+                        "tags": "design",
+                    },
+                    "text": "design note",
+                },
+            ],
+            "pagination": {"has_more": False},
+        }
+
+        response = await client.post(
+            f"/api/v2/agents/{self.TEST_AGENT_ID}/recall/recent",
+            headers=headers,
+            json={"tags": ["release"]},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["count"] == 1
+        assert response.json()["memories"][0]["id"] == "m1"
+
+    @pytest.mark.asyncio
+    async def test_recall_as_of_accepts_tag_filter(
+        self, client, auth_headers, mock_moorcheh
+    ):
+        """Test recall/as-of forwards tags to temporal retrieval."""
+        await client.post(
+            "/api/v2/agents",
+            headers=auth_headers,
+            json={"agent_id": self.TEST_AGENT_ID},
+        )
+        activate_resp = await client.post(
+            f"/api/v2/agents/{self.TEST_AGENT_ID}/activate", headers=auth_headers
+        )
+        token = activate_resp.json()["session_token"]
+        headers = {**auth_headers, "X-Session-Token": token}
+
+        mock_moorcheh.documents.fetch_text_data.return_value = {
+            "items": [
+                {
+                    "id": "m1",
+                    "metadata": {
+                        "created_at": "2025-06-01T10:00:00",
+                        "tags": "release,backend",
+                    },
+                    "text": "release note",
+                },
+                {
+                    "id": "m2",
+                    "metadata": {
+                        "created_at": "2025-06-01T10:00:00",
+                        "tags": "design",
+                    },
+                    "text": "design note",
+                },
+            ],
+            "pagination": {"has_more": False},
+        }
+
+        response = await client.post(
+            f"/api/v2/agents/{self.TEST_AGENT_ID}/recall/as-of",
+            headers=headers,
+            json={"as_of": "2025-06-02T00:00:00Z", "tags": ["release"]},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["count"] == 1
+        assert response.json()["memories"][0]["id"] == "m1"
+
+    @pytest.mark.asyncio
+    async def test_recall_changed_since_accepts_tag_filter(
+        self, client, auth_headers, mock_moorcheh
+    ):
+        """Test recall/changed-since forwards tags to temporal retrieval."""
+        await client.post(
+            "/api/v2/agents",
+            headers=auth_headers,
+            json={"agent_id": self.TEST_AGENT_ID},
+        )
+        activate_resp = await client.post(
+            f"/api/v2/agents/{self.TEST_AGENT_ID}/activate", headers=auth_headers
+        )
+        token = activate_resp.json()["session_token"]
+        headers = {**auth_headers, "X-Session-Token": token}
+
+        mock_moorcheh.documents.fetch_text_data.return_value = {
+            "items": [
+                {
+                    "id": "m1",
+                    "metadata": {
+                        "created_at": "2025-06-01T10:00:00",
+                        "updated_at": "2025-06-03T10:00:00",
+                        "tags": "release,backend",
+                    },
+                    "text": "release note",
+                },
+                {
+                    "id": "m2",
+                    "metadata": {
+                        "created_at": "2025-06-01T10:00:00",
+                        "updated_at": "2025-06-03T10:00:00",
+                        "tags": "design",
+                    },
+                    "text": "design note",
+                },
+            ],
+            "pagination": {"has_more": False},
+        }
+
+        response = await client.post(
+            f"/api/v2/agents/{self.TEST_AGENT_ID}/recall/changed-since",
+            headers=headers,
+            json={"since": "2025-06-02T00:00:00Z", "tags": ["release"]},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["count"] == 1
+        assert response.json()["memories"][0]["id"] == "m1"
+
+    @pytest.mark.asyncio
     async def test_conflicts_list_api(self, client, auth_headers):
         """Test listing conflicts via API."""
         await client.post(

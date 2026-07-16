@@ -165,6 +165,7 @@ class RecallAsOfRequest(BaseModel):
     )
     limit: int | None = Field(default=None, ge=1, description="Max results")
     type: list[str] | None = Field(default=None, description="Memory type filters")
+    tags: list[str] | None = Field(default=None, description="Tag filters")
 
     @field_validator("type")
     @classmethod
@@ -208,6 +209,7 @@ class RecallChangedSinceRequest(BaseModel):
     )
     limit: int | None = Field(default=None, ge=1, description="Max results")
     type: list[str] | None = Field(default=None, description="Memory type filters")
+    tags: list[str] | None = Field(default=None, description="Tag filters")
 
     @field_validator("type")
     @classmethod
@@ -247,6 +249,7 @@ class RecallRecentRequest(BaseModel):
 
     limit: int | None = Field(default=None, ge=1, description="Max results")
     type: list[str] | None = Field(default=None, description="Memory type filters")
+    tags: list[str] | None = Field(default=None, description="Tag filters")
 
     @field_validator("type")
     @classmethod
@@ -1134,6 +1137,7 @@ async def recall_as_of(
             as_of_date=request.as_of.isoformat(),
             agent_id=agent_id,
             type=request.type,
+            tags=request.tags,
             limit=limit,
         )
 
@@ -1179,6 +1183,7 @@ async def recall_changed_since(
             since_date=request.since.isoformat(),
             agent_id=agent_id,
             type=request.type,
+            tags=request.tags,
             limit=limit,
         )
 
@@ -1224,6 +1229,7 @@ async def recall_recent(
             read_service.search_recent,
             agent_id=agent_id,
             type=request.type,
+            tags=request.tags,
             limit=limit,
         )
 
