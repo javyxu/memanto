@@ -537,31 +537,41 @@ class MemoryReadService:
         """
         from memanto.app.utils.temporal_helpers import parse_iso_timestamp
 
-        filtered = results
+        after_dt = None
+        before_dt = None
 
         if created_after:
             try:
                 after_dt = parse_iso_timestamp(created_after)
-                filtered = [
-                    r
-                    for r in filtered
-                    if r.get("created_at")
-                    and parse_iso_timestamp(r["created_at"]) >= after_dt
-                ]
-            except (ValueError, AttributeError):
-                pass  # Skip invalid timestamps
+            except (ValueError, AttributeError, TypeError):
+                pass  # Keep existing fail-open behavior for invalid caller input.
 
         if created_before:
             try:
                 before_dt = parse_iso_timestamp(created_before)
-                filtered = [
-                    r
-                    for r in filtered
-                    if r.get("created_at")
-                    and parse_iso_timestamp(r["created_at"]) <= before_dt
-                ]
-            except (ValueError, AttributeError):
-                pass  # Skip invalid timestamps
+            except (ValueError, AttributeError, TypeError):
+                pass  # Keep existing fail-open behavior for invalid caller input.
+
+        if after_dt is None and before_dt is None:
+            return results
+
+        filtered = []
+        for result in results:
+            raw_created = result.get("created_at")
+            if not raw_created:
+                continue
+
+            try:
+                created_dt = parse_iso_timestamp(raw_created)
+            except (ValueError, AttributeError, TypeError):
+                continue
+
+            if after_dt is not None and created_dt < after_dt:
+                continue
+            if before_dt is not None and created_dt > before_dt:
+                continue
+
+            filtered.append(result)
 
         return filtered
 

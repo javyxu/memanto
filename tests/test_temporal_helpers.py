@@ -1,5 +1,6 @@
 from datetime import timezone
 
+from memanto.app.services.memory_read_service import MemoryReadService
 from memanto.app.utils.temporal_helpers import parse_iso_timestamp
 
 
@@ -15,3 +16,19 @@ def test_parse_iso_timestamp_assumes_naive_values_are_utc():
 
     assert parsed.tzinfo == timezone.utc
     assert parsed.isoformat() == "2026-01-15T13:30:00+00:00"
+
+
+def test_temporal_filter_skips_malformed_memory_timestamps_per_record():
+    service = MemoryReadService(object())
+
+    results = [
+        {"id": "old", "created_at": "2025-01-01T00:00:00Z"},
+        {"id": "new", "created_at": "2025-02-01T00:00:00Z"},
+        {"id": "bad", "created_at": "not-a-timestamp"},
+    ]
+
+    filtered = service._apply_temporal_filter(
+        results, created_after="2025-01-15T00:00:00Z"
+    )
+
+    assert [memory["id"] for memory in filtered] == ["new"]
