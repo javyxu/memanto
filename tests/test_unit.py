@@ -11,6 +11,7 @@ import jwt
 import pytest
 
 from memanto.app.config import settings
+from memanto.app.core import MemoryRecord
 from memanto.app.models.session import AgentCreate, AgentPattern, Session, SessionStatus
 from memanto.app.services.agent_service import AgentService
 from memanto.app.services.session_service import SessionService
@@ -250,6 +251,25 @@ class TestSessionService:
         sessions = session_service.list_sessions()
 
         assert [session.agent_id for session in sessions] == [valid_session.agent_id]
+
+
+class TestMemoryRecord:
+    """Unit tests for core memory record invariants."""
+
+    def test_set_ttl_rejects_non_positive_values(self):
+        """Zero/negative TTLs should not create immediately expired memories."""
+        memory = MemoryRecord(
+            type="fact",
+            title="TTL guard",
+            content="This memory should require a positive TTL.",
+            agent_id="agent-ttl",
+            actor_id="agent-ttl",
+            source="agent",
+        )
+
+        for ttl in (0, -60):
+            with pytest.raises(ValueError, match="ttl_seconds must be greater than 0"):
+                memory.set_ttl(ttl)
 
 
 class TestAgentService:
