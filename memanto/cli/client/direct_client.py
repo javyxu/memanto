@@ -39,7 +39,7 @@ from memanto.app.utils.errors import (
     SessionExpiredError,
     SessionNotFoundError,
 )
-from memanto.app.utils.validation import InputLimits
+from memanto.app.utils.validation import InputLimits, validate_recall_limit
 from memanto.cli.config.manager import ConfigManager
 
 logger = logging.getLogger(__name__)
@@ -1036,7 +1036,7 @@ class DirectClient:
         """
         if limit is None:
             limit = ConfigManager().get_recall_config()["limit"]
-        self._validate_recall_limit(limit)
+        validate_recall_limit(limit)
 
         # Ensure there is a valid, non-expired session for this agent
         self._get_validated_session_for_agent(agent_id)
@@ -1079,7 +1079,7 @@ class DirectClient:
         """
         if limit is None:
             limit = ConfigManager().get_recall_config()["limit"]
-        self._validate_recall_limit(limit)
+        validate_recall_limit(limit)
 
         # Ensure there is a valid, non-expired session for this agent
         self._get_validated_session_for_agent(agent_id)
@@ -1120,7 +1120,7 @@ class DirectClient:
         """
         if limit is None:
             limit = ConfigManager().get_recall_config()["limit"]
-        self._validate_recall_limit(limit)
+        validate_recall_limit(limit)
 
         # Ensure there is a valid, non-expired session for this agent
         self._get_validated_session_for_agent(agent_id)
@@ -1755,10 +1755,4 @@ class DirectClient:
         """Validate search parameters."""
         if not query or not query.strip():
             raise ValueError("Search query must be a non-empty string")
-        DirectClient._validate_recall_limit(limit)
-
-    @staticmethod
-    def _validate_recall_limit(limit: int) -> None:
-        """Validate recall result limits before backend calls."""
-        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
-            raise ValueError(f"Limit must be an integer between 1 and 100, got {limit}")
+        validate_recall_limit(limit)

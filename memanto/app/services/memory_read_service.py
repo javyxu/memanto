@@ -391,9 +391,7 @@ class MemoryReadService:
             if not namespaces:
                 return {"results": [], "total_found": 0}
 
-            unique_memories = self._fetch_all_memories(
-                namespaces, type=type, tags=tags
-            )
+            unique_memories = self._fetch_all_memories(namespaces, type=type, tags=tags)
 
             # Sort by created_at descending (most recent first)
             def _created_sort_key(m: dict[str, Any]) -> str:

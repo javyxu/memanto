@@ -15,6 +15,7 @@ from pathlib import Path
 from dotenv import load_dotenv, set_key
 
 from memanto.app.clients.backend import Backend, parse_backend
+from memanto.app.utils.validation import validate_recall_limit
 
 yaml = importlib.import_module("yaml")
 
@@ -376,8 +377,7 @@ class ConfigManager:
         data = self.load_yaml()
         recall = data.setdefault("recall", {})
         if limit is not None:
-            if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
-                raise ValueError("limit must be an integer between 1 and 100")
+            validate_recall_limit(limit)
             recall["limit"] = limit
         if min_similarity is not None:
             if (
