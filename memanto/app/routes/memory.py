@@ -87,6 +87,59 @@ class RecallRequest(BaseModel):
         default=None, ge=0.0, le=1.0, description="Minimum similarity score (0-1)"
     )
     type: list[str] | None = Field(default=None, description="Memory type filters")
+    created_after: datetime | None = Field(
+        default=None,
+        description=(
+            "Include only memories created at or after this timestamp. "
+            "Date-only values use the start of that day."
+        ),
+    )
+    created_before: datetime | None = Field(
+        default=None,
+        description=(
+            "Include only memories created at or before this timestamp. "
+            "Date-only values use the end of that day."
+        ),
+    )
+
+    @field_validator("created_after", mode="before")
+    @classmethod
+    def parse_created_after(cls, v: object) -> datetime | None:
+        if v is None:
+            return None
+        return _parse_recall_temporal_bound(v, end_of_day=False)
+
+    @field_validator("created_before", mode="before")
+    @classmethod
+    def parse_created_before(cls, v: object) -> datetime | None:
+        if v is None:
+            return None
+        return _parse_recall_temporal_bound(v, end_of_day=True)
+
+
+def _parse_recall_temporal_bound(v: object, *, end_of_day: bool) -> datetime:
+    if isinstance(v, datetime):
+        return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+    if isinstance(v, date):
+        boundary = time(23, 59, 59) if end_of_day else time(0, 0, 0)
+        return datetime.combine(v, boundary, tzinfo=timezone.utc)
+    if isinstance(v, str):
+        if "T" not in v and " " not in v:
+            try:
+                boundary = time(23, 59, 59) if end_of_day else time(0, 0, 0)
+                return datetime.combine(
+                    date.fromisoformat(v), boundary, tzinfo=timezone.utc
+                )
+            except ValueError:
+                pass
+        try:
+            dt = datetime.fromisoformat(v.replace("Z", "+00:00"))
+            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        except ValueError:
+            raise ValueError(
+                f"Invalid value '{v}'. Use YYYY-MM-DD or ISO 8601 datetime."
+            )
+    raise ValueError(f"Cannot parse temporal recall bound from {type(v)}")
 
     @field_validator("query")
     @classmethod
@@ -762,6 +815,12 @@ async def recall(
             agent_id=agent_id,
             type=request.type,
             min_similarity_score=min_similarity,
+            created_after=request.created_after.isoformat()
+            if request.created_after
+            else None,
+            created_before=request.created_before.isoformat()
+            if request.created_before
+            else None,
             limit=limit,
         )
 

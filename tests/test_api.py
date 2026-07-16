@@ -685,6 +685,54 @@ class TestMEMANTOAPI:
         mock_moorcheh.similarity_search.query.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_recall_applies_created_after_filter(
+        self, client, auth_headers, mock_moorcheh
+    ):
+        """Regression test: /recall must honor temporal helper filters."""
+        await client.post(
+            "/api/v2/agents",
+            headers=auth_headers,
+            json={"agent_id": self.TEST_AGENT_ID},
+        )
+        activate_resp = await client.post(
+            f"/api/v2/agents/{self.TEST_AGENT_ID}/activate", headers=auth_headers
+        )
+        token = activate_resp.json()["session_token"]
+
+        mock_moorcheh.similarity_search.query.return_value = {
+            "results": [
+                {
+                    "id": "old-memory",
+                    "text": "[FACT] Old preference\n\nUse the legacy importer.",
+                    "memory_type": "fact",
+                    "created_at": "2024-12-31T23:59:59+00:00",
+                },
+                {
+                    "id": "new-memory",
+                    "text": "[FACT] New preference\n\nUse the current importer.",
+                    "memory_type": "fact",
+                    "created_at": "2025-01-02T00:00:00+00:00",
+                },
+            ],
+            "total_found": 2,
+        }
+
+        headers = {**auth_headers, "X-Session-Token": token}
+        response = await client.post(
+            f"/api/v2/agents/{self.TEST_AGENT_ID}/recall",
+            headers=headers,
+            json={
+                "query": "importer preference",
+                "limit": 10,
+                "created_after": "2025-01-01T00:00:00Z",
+            },
+        )
+
+        assert response.status_code == 200
+        memories = response.json()["memories"]
+        assert [memory["id"] for memory in memories] == ["new-memory"]
+
+    @pytest.mark.asyncio
     async def test_get_agent(self, client, auth_headers):
         """Test getting agent details"""
         await client.post(
