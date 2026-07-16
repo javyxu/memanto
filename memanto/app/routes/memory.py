@@ -280,6 +280,27 @@ def enforce_session_scope(session: Session, agent_id: str) -> None:
         )
 
 
+def resolve_recall_limit(request_limit: int | None) -> int:
+    recall_cfg = _config_manager.get_recall_config()
+    raw_limit = (
+        request_limit
+        if request_limit is not None
+        else recall_cfg.get("limit", settings.RECALL_LIMIT)
+    )
+    try:
+        limit = int(raw_limit)
+    except (TypeError, ValueError) as e:
+        raise HTTPException(
+            status_code=400, detail=f"Invalid recall configuration: {e}"
+        ) from e
+    if limit < 1:
+        raise HTTPException(
+            status_code=400, detail="Invalid recall configuration: limit must be >= 1"
+        )
+    CostGuard.validate_k_limit(limit)
+    return limit
+
+
 @router.post("/{agent_id}/remember", response_model=RememberResponse)
 async def remember(
     agent_id: str,
@@ -783,18 +804,13 @@ async def recall(
     enforce_session_scope(session, agent_id)
 
     recall_cfg = _config_manager.get_recall_config()
-    raw_limit = (
-        request.limit
-        if request.limit is not None
-        else recall_cfg.get("limit", settings.RECALL_LIMIT)
-    )
     raw_min_similarity = (
         request.min_similarity
         if request.min_similarity is not None
         else recall_cfg.get("min_similarity")
     )
     try:
-        limit = int(raw_limit)
+        limit = resolve_recall_limit(request.limit)
         min_similarity = (
             None if raw_min_similarity is None else float(raw_min_similarity)
         )
@@ -802,8 +818,6 @@ async def recall(
         raise HTTPException(
             status_code=400, detail=f"Invalid recall configuration: {e}"
         )
-    CostGuard.validate_k_limit(limit)
-
     try:
         # Initialize memory read service
         read_service = MemoryReadService(client)
@@ -1110,10 +1124,7 @@ async def recall_as_of(
     """
     enforce_session_scope(session, agent_id)
 
-    # request.limit is None → fetch all (no cap). Cost guard only applies when capped.
-    limit = request.limit
-    if limit is not None:
-        CostGuard.validate_k_limit(limit)
+    limit = resolve_recall_limit(request.limit)
 
     try:
         read_service = MemoryReadService(client)
@@ -1158,10 +1169,7 @@ async def recall_changed_since(
     """
     enforce_session_scope(session, agent_id)
 
-    # request.limit is None → fetch all (no cap). Cost guard only applies when capped.
-    limit = request.limit
-    if limit is not None:
-        CostGuard.validate_k_limit(limit)
+    limit = resolve_recall_limit(request.limit)
 
     try:
         read_service = MemoryReadService(client)
@@ -1207,10 +1215,7 @@ async def recall_recent(
     """
     enforce_session_scope(session, agent_id)
 
-    # request.limit is None → fetch all (no cap). Cost guard only applies when capped.
-    limit = request.limit
-    if limit is not None:
-        CostGuard.validate_k_limit(limit)
+    limit = resolve_recall_limit(request.limit)
 
     try:
         read_service = MemoryReadService(client)

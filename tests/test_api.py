@@ -1430,6 +1430,88 @@ class TestMEMANTOAPI:
             assert response.status_code == 422
 
         mock_moorcheh.similarity_search.query.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_temporal_recall_defaults_to_config_limit(
+        self, client, auth_headers, mock_moorcheh
+    ):
+        """Temporal HTTP recall should cap omitted limits like CLI/SDK recall."""
+        await client.post(
+            "/api/v2/agents",
+            headers=auth_headers,
+            json={"agent_id": self.TEST_AGENT_ID},
+        )
+        activate_resp = await client.post(
+            f"/api/v2/agents/{self.TEST_AGENT_ID}/activate", headers=auth_headers
+        )
+        token = activate_resp.json()["session_token"]
+        headers = {**auth_headers, "X-Session-Token": token}
+
+        items = [
+            {
+                "id": f"m{i}",
+                "metadata": {
+                    "created_at": f"2025-01-{i + 1:02d}T00:00:00Z",
+                    "updated_at": f"2025-01-{i + 1:02d}T01:00:00Z",
+                    "memory_type": "fact",
+                    "status": "active",
+                },
+                "text": f"[FACT] Memory {i}\n\ncontent {i}",
+            }
+            for i in range(12)
+        ]
+        mock_moorcheh.documents.fetch_text_data.return_value = {
+            "status": "ok",
+            "items": items,
+            "pagination": {"has_more": False},
+        }
+
+        requests = [
+            ("recall/as-of", {"as_of": "2025-12-31T00:00:00Z"}),
+            ("recall/changed-since", {"since": "2024-12-31T00:00:00Z"}),
+            ("recall/recent", {}),
+        ]
+
+        for route, payload in requests:
+            response = await client.post(
+                f"/api/v2/agents/{self.TEST_AGENT_ID}/{route}",
+                headers=headers,
+                json=payload,
+            )
+            assert response.status_code == 200
+            data = response.json()
+            assert data["count"] == 10
+            assert len(data["memories"]) == 10
+
+    @pytest.mark.asyncio
+    async def test_temporal_recall_rejects_non_positive_config_limit(
+        self, client, auth_headers, mock_moorcheh
+    ):
+        """Config-derived temporal limits must enforce the same lower bound."""
+        await client.post(
+            "/api/v2/agents",
+            headers=auth_headers,
+            json={"agent_id": self.TEST_AGENT_ID},
+        )
+        activate_resp = await client.post(
+            f"/api/v2/agents/{self.TEST_AGENT_ID}/activate", headers=auth_headers
+        )
+        token = activate_resp.json()["session_token"]
+        headers = {**auth_headers, "X-Session-Token": token}
+
+        with patch("memanto.app.routes.memory._config_manager") as mock_config:
+            mock_config.get_recall_config.return_value = {
+                "limit": 0,
+                "min_similarity": 0.0,
+            }
+            response = await client.post(
+                f"/api/v2/agents/{self.TEST_AGENT_ID}/recall/recent",
+                headers=headers,
+                json={},
+            )
+
+        assert response.status_code == 400
+        assert "limit must be >= 1" in str(response.json()["detail"])
         mock_moorcheh.documents.fetch_text_data.assert_not_called()
 
     @pytest.mark.asyncio
