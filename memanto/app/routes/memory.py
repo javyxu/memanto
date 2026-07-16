@@ -116,6 +116,20 @@ class RecallRequest(BaseModel):
             return None
         return _parse_recall_temporal_bound(v, end_of_day=True)
 
+    @field_validator("query")
+    @classmethod
+    def query_must_not_be_blank(cls, value: str) -> str:
+        """Reject recall queries that contain only whitespace."""
+        if not value.strip():
+            raise ValueError("query must be a non-empty string")
+        return value
+
+    @field_validator("type")
+    @classmethod
+    def type_filters_must_be_valid(cls, value: list[str] | None) -> list[str] | None:
+        """Reject recall filters that are not supported memory types."""
+        return _validate_memory_type_filters(value)
+
 
 def _parse_recall_temporal_bound(v: object, *, end_of_day: bool) -> datetime:
     if isinstance(v, datetime):
@@ -140,20 +154,6 @@ def _parse_recall_temporal_bound(v: object, *, end_of_day: bool) -> datetime:
                 f"Invalid value '{v}'. Use YYYY-MM-DD or ISO 8601 datetime."
             )
     raise ValueError(f"Cannot parse temporal recall bound from {type(v)}")
-
-    @field_validator("query")
-    @classmethod
-    def query_must_not_be_blank(cls, value: str) -> str:
-        """Reject recall queries that contain only whitespace."""
-        if not value.strip():
-            raise ValueError("query must be a non-empty string")
-        return value
-
-    @field_validator("type")
-    @classmethod
-    def type_filters_must_be_valid(cls, value: list[str] | None) -> list[str] | None:
-        """Reject recall filters that are not supported memory types."""
-        return _validate_memory_type_filters(value)
 
 
 class RecallAsOfRequest(BaseModel):
