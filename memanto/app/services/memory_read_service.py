@@ -30,7 +30,7 @@ def _validate_filter_token(value: Any, field_name: str) -> str:
 
 
 # Moorcheh caps a single similarity search at 100 rows.
-MOORCHEH_MAX_TOP_K = 30
+MOORCHEH_MAX_TOP_K = 100
 # When post-retrieval filters (temporal / confidence) are active we widen
 # the fetched candidate pool to this size (bounded by MOORCHEH_MAX_TOP_K) so
 # that filtering does not discard relevant rows that rank outside the
