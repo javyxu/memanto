@@ -29,13 +29,26 @@ def _validate_filter_token(value: Any, field_name: str) -> str:
     return token
 
 
+# Moorcheh caps a single similarity search at 100 rows.
+MOORCHEH_MAX_TOP_K = 100
+# When post-retrieval filters (temporal / confidence) are active we widen
+# the fetched candidate pool to this size (bounded by MOORCHEH_MAX_TOP_K) so
+# that filtering does not discard relevant rows that rank outside the
+# caller's page. See MemoryReadService.search_memories.
+POST_FILTER_CANDIDATE_POOL = 100
+
+
 class MemoryReadService:
+    """Read, search, and format memories from the configured Moorcheh backend."""
+
     def __init__(self, moorcheh_client: "MoorchehClient"):
+        """Initialize the reader with an active Moorcheh client."""
         self.client = moorcheh_client
         self._namespace_service = None
 
     @property
     def namespace_service(self):
+        """Return the namespace service, creating it on first access."""
         if self._namespace_service is None:
             from memanto.app.services.namespace_service import NamespaceService
 
@@ -115,7 +128,22 @@ class MemoryReadService:
             # Build query parameters
             # Request extra results to handle offset (Moorcheh doesn't have native offset support)
             requested_limit = limit + offset
-            top_k = min(requested_limit, 100)  # Moorcheh max is 100
+
+            # Temporal, confidence, and TTL constraints are all enforced as
+            # post-processing on the rows the backend returns (see below), so
+            # the candidate pool we fetch must be large enough that those
+            # filters do not silently drop relevant rows. If we only fetched
+            # `limit + offset` rows, a date-scoped, confidence-scoped, or
+            # TTL-expired-heavy query would filter *within the top-N
+            # most-similar rows*, causing in-window memories that rank just
+            # outside the top-N to be lost entirely (timeline amnesia / poor
+            # recall). TTL enforcement (_filter_expired_memories) always runs
+            # below regardless of caller input, so we always over-fetch up to
+            # Moorcheh's hard cap rather than only when a temporal/confidence
+            # filter is explicitly requested.
+            top_k = min(
+                max(requested_limit, POST_FILTER_CANDIDATE_POOL), MOORCHEH_MAX_TOP_K
+            )
 
             # Perform search with server-side filtering.
             # Only enable kiosk_mode when the caller actually set a positive
@@ -193,9 +221,12 @@ class MemoryReadService:
             limit: Max results
         """
         try:
-            from memanto.app.utils.temporal_helpers import parse_iso_timestamp
+            from memanto.app.utils.temporal_helpers import (
+                parse_as_of_timestamp,
+                parse_iso_timestamp,
+            )
 
-            as_of_dt = parse_iso_timestamp(as_of_date)
+            as_of_dt = parse_as_of_timestamp(as_of_date)
 
             namespaces = self._get_search_namespaces(agent_id)
             if not namespaces:
@@ -208,7 +239,7 @@ class MemoryReadService:
 
             all_memories = self._fetch_all_memories(namespaces, type=type, tags=tags)
             all_memories = self._apply_temporal_filter(
-                all_memories, created_before=as_of_date
+                all_memories, created_before=as_of_dt.isoformat()
             )
 
             # Filter to only include memories valid at as_of_date
@@ -305,10 +336,21 @@ class MemoryReadService:
                     except (ValueError, AttributeError):
                         pass
 
-            # Sort by updated_at descending (most recent first)
-            changed_memories.sort(
-                key=lambda m: m.get("updated_at", m.get("created_at", "")), reverse=True
-            )
+            # Sort by the timestamp that made the memory qualify.
+            def _changed_sort_key(m: dict[str, Any]) -> datetime:
+                """Return a stable aware timestamp for changed-memory ordering."""
+                if m.get("change_type") == "created":
+                    raw = m.get("created_at") or m.get("updated_at")
+                else:
+                    raw = m.get("updated_at") or m.get("created_at")
+                if not raw:
+                    return datetime.min.replace(tzinfo=timezone.utc)
+                try:
+                    return parse_iso_timestamp(str(raw))
+                except Exception:
+                    return datetime.min.replace(tzinfo=timezone.utc)
+
+            changed_memories.sort(key=_changed_sort_key, reverse=True)
 
             # Apply limit
             if limit is not None:
@@ -328,6 +370,7 @@ class MemoryReadService:
         self,
         agent_id: str,
         type: list[str] | None = None,
+        tags: list[str] | None = None,
         limit: int | None = 10,
     ) -> dict[str, Any]:
         """
@@ -336,6 +379,7 @@ class MemoryReadService:
         Args:
             agent_id: Agent whose memories to search
             type: Optional memory type filters
+            tags: Optional tag filters
             limit: Max results to return
         """
         try:
@@ -345,10 +389,11 @@ class MemoryReadService:
             if not namespaces:
                 return {"results": [], "total_found": 0}
 
-            unique_memories = self._fetch_all_memories(namespaces, type=type)
+            unique_memories = self._fetch_all_memories(namespaces, type=type, tags=tags)
 
             # Sort by created_at descending (most recent first)
             def _created_sort_key(m: dict[str, Any]) -> str:
+                """Return a comparable created-at timestamp for recent ordering."""
                 raw = m.get("created_at")
                 if not raw:
                     return ""
@@ -397,18 +442,23 @@ class MemoryReadService:
                 if not next_token:
                     break
 
-        seen_ids: set[str] = set()
-        memories: list[dict[str, Any]] = []
-        for item in items:
+        latest_by_id: dict[str, tuple[tuple[datetime, int], dict[str, Any]]] = {}
+        for index, item in enumerate(items):
             # Skip summary chunks — only return real memory documents
             if isinstance(item, dict) and item.get("is_summary"):
                 continue
             formatted = self._format_memory_item(item)
             mid = formatted.get("id")
-            if not mid or mid in seen_ids:
+            if not mid:
                 continue
-            seen_ids.add(cast(str, mid))
 
+            version_key = self._memory_version_key(formatted, index)
+            existing = latest_by_id.get(cast(str, mid))
+            if existing is None or version_key >= existing[0]:
+                latest_by_id[cast(str, mid)] = (version_key, formatted)
+
+        memories: list[dict[str, Any]] = []
+        for _, formatted in latest_by_id.values():
             if type and formatted.get("type") not in type:
                 continue
             if tags:
@@ -419,6 +469,28 @@ class MemoryReadService:
             memories.append(formatted)
 
         return self._filter_expired_memories(memories)
+
+    def _memory_version_key(
+        self, memory: dict[str, Any], fetch_index: int
+    ) -> tuple[datetime, int]:
+        """Order duplicate memory ids by their newest known timestamp.
+
+        Delete-and-recreate updates can briefly expose the old and new document
+        with the same id. Prefer the newest updated_at/created_at value; when
+        timestamps are missing or equal, keep the later fetched item.
+        """
+        from memanto.app.utils.temporal_helpers import parse_iso_timestamp
+
+        fallback = datetime.min.replace(tzinfo=timezone.utc)
+        for field in ("updated_at", "created_at"):
+            raw = memory.get(field)
+            if not raw:
+                continue
+            try:
+                return parse_iso_timestamp(str(raw)), fetch_index
+            except (TypeError, ValueError):
+                continue
+        return fallback, fetch_index
 
     def _build_filtered_query(
         self,
@@ -497,31 +569,41 @@ class MemoryReadService:
         """
         from memanto.app.utils.temporal_helpers import parse_iso_timestamp
 
-        filtered = results
+        after_dt = None
+        before_dt = None
 
         if created_after:
             try:
                 after_dt = parse_iso_timestamp(created_after)
-                filtered = [
-                    r
-                    for r in filtered
-                    if r.get("created_at")
-                    and parse_iso_timestamp(r["created_at"]) >= after_dt
-                ]
-            except (ValueError, AttributeError):
-                pass  # Skip invalid timestamps
+            except (ValueError, AttributeError, TypeError):
+                pass  # Keep existing fail-open behavior for invalid caller input.
 
         if created_before:
             try:
                 before_dt = parse_iso_timestamp(created_before)
-                filtered = [
-                    r
-                    for r in filtered
-                    if r.get("created_at")
-                    and parse_iso_timestamp(r["created_at"]) <= before_dt
-                ]
-            except (ValueError, AttributeError):
-                pass  # Skip invalid timestamps
+            except (ValueError, AttributeError, TypeError):
+                pass  # Keep existing fail-open behavior for invalid caller input.
+
+        if after_dt is None and before_dt is None:
+            return results
+
+        filtered = []
+        for result in results:
+            raw_created = result.get("created_at")
+            if not raw_created:
+                continue
+
+            try:
+                created_dt = parse_iso_timestamp(raw_created)
+            except (ValueError, AttributeError, TypeError):
+                continue
+
+            if after_dt is not None and created_dt < after_dt:
+                continue
+            if before_dt is not None and created_dt > before_dt:
+                continue
+
+            filtered.append(result)
 
         return filtered
 
