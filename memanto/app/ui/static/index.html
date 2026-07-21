@@ -3382,15 +3382,21 @@
             let url, body = { limit: 50 };
             if (type) body.type = [type];
 
+            // Send bare YYYY-MM-DD values as-is (not Date.toISOString()) — the
+            // backend's own date-only parsing already applies the right day
+            // boundary (start-of-day for since/created_after, end-of-day for
+            // as_of/created_before) in UTC. Pre-converting here would collapse
+            // "as of" to midnight instead of end-of-day and, for the range's
+            // "to" bound, silently mix in the browser's local timezone.
             if (mode === 'asof') {
-                body.as_of = new Date(tmDate).toISOString();
+                body.as_of = tmDate;
                 url = `/api/v2/agents/${S.agentId}/recall/as-of`;
             } else if (mode === 'since') {
-                body.since = new Date(tmDate).toISOString();
+                body.since = tmDate;
                 url = `/api/v2/agents/${S.agentId}/recall/changed-since`;
             } else {
-                if (from) body.created_after = new Date(from).toISOString();
-                if (to) body.created_before = new Date(to + 'T23:59:59').toISOString();
+                if (from) body.created_after = from;
+                if (to) body.created_before = to;
                 if (q) {
                     body.query = q;
                     url = `/api/v2/agents/${S.agentId}/recall`;
